@@ -24,13 +24,13 @@ export function NurseSidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="hidden w-64 shrink-0 border-r border-slate-200 bg-white pt-20 md:flex md:flex-col">
+    <aside className="hidden w-64 shrink-0 bg-white pt-20 shadow-sm md:flex md:flex-col">
       <div className="px-6 pb-7">
         <h2 className="text-lg font-black text-slate-900">IVF Command</h2>
         <p className="text-[10px] uppercase tracking-[0.2em] text-slate-500">Precision Care</p>
       </div>
 
-      <nav className="space-y-1 px-2">
+      <nav className="space-y-0.5 px-3">
         {navItems.map((item) => {
           const Icon = item.icon;
           const active = pathname === item.href;
@@ -40,10 +40,10 @@ export function NurseSidebar() {
               key={item.href}
               href={item.href}
               className={cn(
-                "mx-2 flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium transition-all",
+                "mx-1 flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium transition-all duration-200",
                 active
-                  ? "translate-x-0.5 rounded-l-lg border-r-4 border-slate-900 bg-slate-100 text-slate-900 shadow-sm"
-                  : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                  ? "bg-slate-100 text-slate-900 shadow-sm font-semibold"
+                  : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
               )}
             >
               <Icon className="size-4" />

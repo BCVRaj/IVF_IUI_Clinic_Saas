@@ -9,9 +9,9 @@ export default function NurseLayout({
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
       <NurseTopbar />
-      <div className="mx-auto flex max-w-screen-2xl">
+      <div className="flex w-full">
         <NurseSidebar />
-        <main className="w-full px-4 pb-10 pt-20 md:px-8">{children}</main>
+        <main className="w-full px-6 pb-10 pt-20 md:px-8">{children}</main>
       </div>
     </div>
   );

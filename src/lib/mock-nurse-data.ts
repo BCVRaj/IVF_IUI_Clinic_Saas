@@ -81,15 +81,47 @@ export const nurseTimeline = [
 ] as const;
 
 export const nurseAlerts = [
+  // Critical alerts from Doctor (mirrored for visibility)
+  {
+    id: "a_doc_1",
+    patientId: "IVF-9021",
+    patientName: "Sarah J.",
+    title: "CRITICAL: Trigger Shot Window",
+    body: "E2 levels confirmed at 3,200 pg/mL. Follicle growth meets criteria. Scheduled trigger injection: 22:30 tonight. Prepare patient and verify consent.",
+    source: "Doctor Alert",
+    severity: "critical",
+    actionRequired: true,
+  },
+  {
+    id: "a_doc_2",
+    patientId: "IVF-4421-B",
+    patientName: "Batch #4421-B",
+    title: "URGENT: Missing PGT-A Results",
+    body: "5 blastocysts pending chromosomal screening from external lab. Expected yesterday at 17:00. Follow up with lab for status update.",
+    source: "Doctor Alert",
+    severity: "urgent",
+    actionRequired: true,
+  },
+  // Nurse-specific alerts
   {
     id: "a1",
-    title: "Lab Value Alert: #IVF-9021",
-    body: "E2 levels exceeding 4000 pg/mL. Possible OHSS risk. Notify Dr. Reynolds immediately.",
+    patientId: "IVF-9021",
+    patientName: "Sarah Chen",
+    title: "Lab Value Alert: OHSS Risk",
+    body: "E2 levels exceeding 4000 pg/mL. Possible OHSS risk. Notify Dr. Reynolds immediately and monitor patient symptoms.",
+    source: "Nurse Alert",
+    severity: "critical",
+    actionRequired: true,
   },
   {
     id: "a2",
-    title: "Consents Missing: #IVF-7210",
-    body: "Surgical consent for retrieval not signed. Do not prep for OT until completed.",
+    patientId: "IVF-7210",
+    patientName: "Marcus Thorne",
+    title: "Missing Surgical Consent: #IVF-7210",
+    body: "Surgical consent for retrieval not signed. Do not prep for OT until completed. Contact patient for signature.",
+    source: "Nurse Alert",
+    severity: "urgent",
+    actionRequired: true,
   },
 ] as const;
 

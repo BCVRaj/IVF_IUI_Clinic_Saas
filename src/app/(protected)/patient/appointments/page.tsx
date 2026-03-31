@@ -36,8 +36,8 @@ export default function PatientAppointmentsPage() {
             </div>
           </div>
           <div className="grid grid-cols-7 gap-2 text-center text-xs">
-            {"SMTWTFS".split("").map((d) => (
-              <p key={d} className="py-2 font-bold text-slate-500">
+            {"SMTWTFS".split("").map((d, index) => (
+              <p key={index} className="py-2 font-bold text-slate-500">
                 {d}
               </p>
             ))}

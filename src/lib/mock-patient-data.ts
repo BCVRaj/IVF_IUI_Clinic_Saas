@@ -1,4 +1,5 @@
 export const patientUser = {
+  id: "IVF-9920",
   name: "Sarah Williams",
   initials: "SW",
   cycleName: "October Protocol",
@@ -30,28 +31,40 @@ export const patientRecentLabReports = [
 export const todaysMedications = [
   {
     id: "m1",
+    patientId: "IVF-9920",
+    patientName: "Sarah Williams",
     name: "Gonal-F Redi-ject",
     dose: "300 IU",
     route: "Subcutaneous Injection",
     time: "08:00 AM",
     status: "taken",
     note: "Confirmed at 08:05 AM",
+    confirmedByNurse: "Nurse A. Chen",
+    confirmedTime: "08:05 AM",
   },
   {
     id: "m2",
+    patientId: "IVF-9920",
+    patientName: "Sarah Williams",
     name: "Menopur",
     dose: "75 IU",
     route: "Mixed Injection",
     time: "09:00 PM",
     status: "upcoming",
+    confirmedByNurse: null,
+    confirmedTime: null,
   },
   {
     id: "m3",
+    patientId: "IVF-9920",
+    patientName: "Sarah Williams",
     name: "Cetrotide",
     dose: "0.25 mg",
     route: "Injection",
     time: "09:00 PM",
     status: "upcoming",
+    confirmedByNurse: null,
+    confirmedTime: null,
   },
 ] as const;
 
@@ -82,7 +95,9 @@ export const medicationHistory = [
 
 export const complaints = [
   {
-    id: "IVF-9842",
+    id: "CMP-2024-0042",
+    patientId: "IVF-9920",
+    patientName: "Sarah Williams",
     title: "Severe nausea following morning Menopur injection",
     datetime: "Oct 24, 2026 • 09:15 AM",
     status: "Open",
@@ -91,9 +106,12 @@ export const complaints = [
     description:
       "Experiencing significant dizziness and nausea about 30 minutes after the injection. Tried ginger tea but it has not subsided yet.",
     response: "Awaiting physician review. Please rest in a cool room and stay hydrated.",
+    reportedToNurse: false,
   },
   {
-    id: "IVF-9711",
+    id: "CMP-2024-0025",
+    patientId: "IVF-9920",
+    patientName: "Sarah Williams",
     title: "Mild localized swelling at the injection site",
     datetime: "Oct 21, 2026 • 02:30 PM",
     status: "Resolved",
@@ -102,9 +120,12 @@ export const complaints = [
     description: "Small red bump, slightly itchy. No fever or spreading redness.",
     response:
       "This is a normal reaction. You can apply a cold compress for 10 minutes. Contact us if redness spreads.",
+    reportedToNurse: true,
   },
   {
-    id: "IVF-9685",
+    id: "CMP-2024-0018",
+    patientId: "IVF-9920",
+    patientName: "Sarah Williams",
     title: "Feeling overwhelmed and anxious about next scan",
     datetime: "Oct 18, 2026 • 08:00 PM",
     status: "Resolved",
@@ -113,6 +134,7 @@ export const complaints = [
     description: "Hard to focus on work today with persistent anxiety and tension in shoulders.",
     response:
       "Counseling support is available. We also shared guided breathing resources in your dashboard.",
+    reportedToNurse: true,
   },
 ] as const;
 

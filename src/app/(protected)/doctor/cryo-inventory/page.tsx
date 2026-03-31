@@ -5,41 +5,41 @@ import { cryoSamples, cryoTanks } from "@/lib/mock-doctor-data";
 
 export default function DoctorCryoInventoryPage() {
   return (
-    <div className="space-y-6 bg-slate-950 text-slate-50">
+    <div className="space-y-6 bg-background text-on-surface">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.2em] text-[#93CDFC]">
+          <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.2em] text-primary">
             Cryogenic Storage Operations
           </p>
-          <h2 className="text-3xl font-extrabold tracking-tight text-slate-50">Cryo Inventory</h2>
+          <h2 className="text-3xl font-extrabold tracking-tight text-primary">Cryo Inventory</h2>
         </div>
         <div className="flex gap-2">
-          <button className="rounded bg-[#00527b] px-4 py-2 text-xs font-bold uppercase tracking-widest text-[#cbe6ff]">
+          <button className="rounded bg-primary/10 px-4 py-2 text-xs font-bold uppercase tracking-widest text-primary hover:bg-primary/20 shadow-none">
             Thaw/Discard
           </button>
-          <button className="rounded bg-gradient-to-r from-white to-[#93CDFC] px-4 py-2 text-xs font-bold uppercase tracking-widest text-[#111318]">
+          <button className="rounded bg-gradient-to-r from-primary to-primary-container px-4 py-2 text-xs font-bold uppercase tracking-widest text-primary-foreground hover:opacity-90 shadow-none">
             Add Sample
           </button>
         </div>
       </header>
 
       <section className="grid grid-cols-12 gap-6">
-        <article className="col-span-12 rounded-xl border border-slate-800 bg-slate-900 p-6 lg:col-span-8">
+        <article className="col-span-12 rounded-xl border border-surface-dim/30 bg-surface-lowest p-6 lg:col-span-8 shadow-[0_8px_32px_rgba(25,28,30,0.04)] backdrop-blur-md">
           <div className="mb-6 flex items-center justify-between">
-            <h3 className="text-sm font-bold uppercase tracking-widest text-slate-50">Cryo-Storage Map: Sector A</h3>
-            <div className="flex gap-3 text-[10px] uppercase tracking-wider text-slate-300">
-              <span className="flex items-center gap-1"><span className="size-2 rounded-full bg-[#93CDFC]" /> Occupied</span>
-              <span className="flex items-center gap-1"><span className="size-2 rounded-full bg-slate-700" /> Available</span>
-              <span className="flex items-center gap-1"><span className="size-2 rounded-full bg-[#ffb4ab]" /> Alert</span>
+            <h3 className="text-sm font-bold uppercase tracking-widest text-on-surface">Cryo-Storage Map: Sector A</h3>
+            <div className="flex gap-3 text-[10px] uppercase tracking-wider text-on-surface-variant">
+              <span className="flex items-center gap-1"><span className="size-2 rounded-full bg-primary" /> Occupied</span>
+              <span className="flex items-center gap-1"><span className="size-2 rounded-full bg-surface" /> Available</span>
+              <span className="flex items-center gap-1"><span className="size-2 rounded-full bg-error" /> Alert</span>
             </div>
           </div>
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             {cryoTanks.map((tank) => (
-              <article key={tank.id} className="rounded-lg border border-slate-800 bg-slate-900 p-4">
+              <article key={tank.id} className="rounded-lg border border-surface-dim/30 bg-surface p-4 shadow-sm">
                 <div className="mb-4 flex items-start justify-between">
-                  <p className="text-[10px] font-black text-[#93CDFC]">{tank.id}</p>
-                  <p className={`text-[10px] ${tank.alert ? "font-bold text-[#ffb4ab]" : "text-slate-300"}`}>
+                  <p className="text-[10px] font-black text-primary">{tank.id}</p>
+                  <p className={`text-[10px] ${tank.alert ? "font-bold text-error" : "text-on-surface-variant"}`}>
                     LN2: {tank.temp}
                   </p>
                 </div>
@@ -52,18 +52,18 @@ export default function DoctorCryoInventoryPage() {
                         key={idx}
                         className={`aspect-square rounded-sm ${
                           alerted
-                            ? "animate-pulse bg-[#ffb4ab]"
+                            ? "animate-pulse bg-error"
                             : filled
-                              ? "bg-[#93CDFC]"
-                              : "bg-slate-700"
+                              ? "bg-primary"
+                              : "bg-surface-dim"
                         }`}
                       />
                     );
                   })}
                 </div>
-                <div className="mt-4 flex items-center justify-between border-t border-slate-800 pt-3">
-                  <p className="text-[10px] uppercase tracking-widest text-slate-300">Capacity</p>
-                  <p className="text-xs font-bold text-slate-50">{tank.capacity}%</p>
+                <div className="mt-4 flex items-center justify-between border-t border-surface-low pt-3">
+                  <p className="text-[10px] uppercase tracking-widest text-on-surface-variant">Capacity</p>
+                  <p className="text-xs font-bold text-on-surface">{tank.capacity}%</p>
                 </div>
               </article>
             ))}
@@ -71,33 +71,33 @@ export default function DoctorCryoInventoryPage() {
         </article>
 
         <aside className="col-span-12 space-y-4 lg:col-span-4">
-          <article className="rounded-xl border border-slate-800 bg-slate-900 p-5">
-            <h3 className="mb-5 text-xs font-bold uppercase tracking-widest text-slate-300">Storage Vitality</h3>
+          <article className="rounded-xl border border-surface-dim/30 bg-surface-lowest p-5 shadow-[0_8px_32px_rgba(25,28,30,0.04)] backdrop-blur-md">
+            <h3 className="mb-5 text-xs font-bold uppercase tracking-widest text-on-surface-variant">Storage Vitality</h3>
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-[10px] uppercase tracking-wider text-slate-300">Total Samples</p>
-                  <p className="text-2xl font-black text-slate-50">14,208</p>
+                  <p className="text-[10px] uppercase tracking-wider text-on-surface-variant">Total Samples</p>
+                  <p className="text-2xl font-black text-on-surface">14,208</p>
                 </div>
-                <div className="rounded bg-[#00527b]/30 p-2 text-[#93CDFC]"><Snowflake className="size-4" /></div>
+                <div className="rounded bg-primary/20 p-2 text-primary"><Snowflake className="size-4" /></div>
               </div>
               <div>
                 <div className="mb-1 flex justify-between text-[10px] uppercase tracking-widest">
-                  <span className="text-slate-300">Canister Utilization</span>
-                  <span className="text-[#93CDFC]">78%</span>
+                  <span className="text-on-surface-variant">Canister Utilization</span>
+                  <span className="text-primary">78%</span>
                 </div>
-                <div className="h-1.5 w-full overflow-hidden rounded bg-slate-700">
-                  <div className="h-full w-[78%] bg-[#93CDFC]" />
+                <div className="h-1.5 w-full overflow-hidden rounded bg-surface-dim">
+                  <div className="h-full w-[78%] bg-primary" />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <div className="rounded border border-slate-800 bg-slate-900 p-3">
-                  <p className="text-[9px] uppercase tracking-widest text-slate-300">Frozen Today</p>
-                  <p className="text-lg font-bold text-slate-50">+24</p>
+                <div className="rounded border border-surface-dim/30 bg-surface p-3 shadow-sm">
+                  <p className="text-[9px] uppercase tracking-widest text-on-surface-variant">Frozen Today</p>
+                  <p className="text-lg font-bold text-on-surface">+24</p>
                 </div>
-                <div className="rounded border border-slate-800 bg-slate-900 p-3">
-                  <p className="text-[9px] uppercase tracking-widest text-slate-300">Thawed Today</p>
-                  <p className="text-lg font-bold text-slate-50">-12</p>
+                <div className="rounded border border-surface-dim/30 bg-surface p-3 shadow-sm">
+                  <p className="text-[9px] uppercase tracking-widest text-on-surface-variant">Thawed Today</p>
+                  <p className="text-lg font-bold text-on-surface">-12</p>
                 </div>
               </div>
             </div>
@@ -105,13 +105,13 @@ export default function DoctorCryoInventoryPage() {
         </aside>
       </section>
 
-      <section className="overflow-hidden rounded-xl border border-slate-800 bg-slate-900">
-        <div className="border-b border-slate-800 px-6 py-4">
-          <h3 className="text-sm font-bold uppercase tracking-widest text-slate-50">Specimen Registry</h3>
+      <section className="overflow-hidden rounded-xl border border-surface-dim/30 bg-surface-lowest shadow-[0_8px_32px_rgba(25,28,30,0.04)] backdrop-blur-md">
+        <div className="border-b border-surface-low px-6 py-4">
+          <h3 className="text-sm font-bold uppercase tracking-widest text-on-surface">Specimen Registry</h3>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[900px] text-left">
-            <thead className="bg-slate-900 text-[10px] uppercase tracking-widest text-slate-300">
+            <thead className="bg-surface text-[10px] uppercase tracking-widest text-on-surface-variant">
               <tr>
                 <th className="px-6 py-4">Patient / Identifier</th>
                 <th className="px-6 py-4">Specimen Type</th>
@@ -121,21 +121,21 @@ export default function DoctorCryoInventoryPage() {
                 <th className="px-6 py-4">Status</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800 text-sm">
+            <tbody className="divide-y divide-surface-low text-sm">
               {cryoSamples.map((sample) => (
-                <tr key={sample.id} className="hover:bg-slate-800/50">
+                <tr key={sample.id} className="hover:bg-surface transition-colors duration-200">
                   <td className="px-6 py-4">
-                    <p className="font-bold text-slate-50">{sample.patient}</p>
-                    <p className="text-[10px] tracking-wider text-slate-300">REF: {sample.id}</p>
+                    <p className="font-bold text-on-surface">{sample.patient}</p>
+                    <p className="text-[10px] tracking-wider text-on-surface-variant">REF: {sample.id}</p>
                   </td>
                   <td className="px-6 py-4">
-                    <span className="rounded bg-slate-800 px-2 py-1 text-[10px] font-bold uppercase tracking-tight text-[#93CDFC]">
+                    <span className="rounded bg-primary/15 px-2 py-1 text-[10px] font-bold uppercase tracking-tight text-primary">
                       {sample.specimen}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-center font-black text-slate-50">{sample.grade}</td>
-                  <td className="px-6 py-4 font-mono text-xs text-[#93CDFC]">{sample.location}</td>
-                  <td className="px-6 py-4 text-xs text-slate-300">{sample.freezeDate}</td>
+                  <td className="px-6 py-4 text-center font-black text-on-surface">{sample.grade}</td>
+                  <td className="px-6 py-4 font-mono text-xs text-primary">{sample.location}</td>
+                  <td className="px-6 py-4 text-xs text-on-surface-variant">{sample.freezeDate}</td>
                   <td className="px-6 py-4">
                     <StatusBadge
                       label={sample.status}

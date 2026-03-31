@@ -28,32 +28,17 @@ const items = [
 
 export function DoctorSidebar() {
   const pathname = usePathname();
-  const isEmbryologyDarkRoute =
-    pathname.startsWith("/doctor/cryo-inventory") ||
-    pathname.startsWith("/doctor/ai-embryo-selection");
 
   return (
-    <aside
-      className={cn(
-        "hidden w-64 shrink-0 pt-8 md:flex md:flex-col",
-        isEmbryologyDarkRoute
-          ? "border-r border-slate-800 bg-slate-950"
-          : "border-r border-slate-200 bg-white"
-      )}
-    >
+    <aside className="hidden w-64 shrink-0 pt-8 bg-white shadow-sm md:flex md:flex-col">
       <div className="mb-8 px-6 pt-12">
-        <h1 className={cn("text-lg font-black", isEmbryologyDarkRoute ? "text-slate-50" : "text-slate-900")}>IVF Precision</h1>
-        <p
-          className={cn(
-            "text-[10px] font-semibold uppercase tracking-widest",
-            isEmbryologyDarkRoute ? "text-sky-300" : "text-slate-500"
-          )}
-        >
-          {isEmbryologyDarkRoute ? "Sub-Zero Lab" : "Scientific Workspace"}
+        <h1 className="text-lg font-black text-slate-900">IVF Precision</h1>
+        <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-500">
+          Scientific Workspace
         </p>
       </div>
 
-      <nav className="space-y-1 px-3">
+      <nav className="space-y-0.5 px-3">
         {items.map((item) => {
           const Icon = item.icon;
           const active = pathname === item.href;
@@ -63,14 +48,10 @@ export function DoctorSidebar() {
               key={item.href}
               href={item.href}
               className={cn(
-                "flex items-center gap-3 rounded px-3 py-2 text-sm font-semibold uppercase tracking-widest transition-all",
+                "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold uppercase tracking-widest transition-all duration-200",
                 active
-                  ? isEmbryologyDarkRoute
-                    ? "border-l-4 border-sky-300 bg-slate-900 text-sky-300"
-                    : "bg-slate-100 text-slate-900"
-                  : isEmbryologyDarkRoute
-                    ? "text-slate-300 hover:bg-slate-900 hover:text-sky-300"
-                    : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                  ? "bg-slate-100 text-slate-900 shadow-sm"
+                  : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
               )}
             >
               <Icon className="size-4" />
