@@ -1,3 +1,5 @@
+"use client";
+import { useEffect, useState } from "react";
 import { AlertTriangle, Flag, CheckCircle2, Clock } from "lucide-react";
 import Link from 'next/link';
 
@@ -9,18 +11,51 @@ import {
   nurseStats,
   nurseTimeline,
 } from "@/lib/mock-nurse-data";
-import { coordinationTasks } from "@/lib/mock-doctor-data";
 
 export default function NurseDashboardPage() {
-  // Current nurse ID (in mock data, Elena Rodriguez)
-  const currentNurseId = "nurse_001";
-  
-  // Get all tasks assigned to current nurse across all statuses
-  const assignedTasks = [
-    ...coordinationTasks.pending,
-    ...coordinationTasks.progress,
-    ...coordinationTasks.done
-  ].filter((task: any) => task.assignedNurseId === currentNurseId);
+  const [assignedTasks, setAssignedTasks] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchTasks = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch("/api/nurse/tasks");
+        if (!response.ok) {
+          throw new Error("Failed to fetch nurse tasks");
+        }
+        const data = await response.json();
+        setAssignedTasks(data.data || []);
+        setError(null);
+      } catch (err: any) {
+        console.error("Error fetching nurse tasks:", err);
+        setError(err.message || "Error loading tasks");
+        setAssignedTasks([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchTasks();
+    
+    // Auto-refresh every 10 seconds
+    const interval = setInterval(fetchTasks, 10000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Format task data from API response
+  const formatTask = (task: any) => ({
+    ...task,
+    patientName: task.patients?.[0] 
+      ? `${task.patients[0].first_name} ${task.patients[0].last_name}`
+      : "Unknown Patient",
+    createdBy: task.user_profiles?.[0]
+      ? `${task.user_profiles[0].first_name} ${task.user_profiles[0].last_name}`
+      : "Unknown Doctor",
+    priority: task.priority === "URGENT" || task.priority === "HIGH" ? "Critical" : "Normal",
+    dueDate: task.due_date ? new Date(task.due_date).toLocaleDateString() : "N/A",
+  });
 
   return (
     <div className="space-y-8 bg-background text-on-surface">
@@ -57,8 +92,8 @@ export default function NurseDashboardPage() {
         ))}
       </section>
 
-      {/* Physician-Assigned Tasks */}
-      {assignedTasks.length > 0 && (
+      {/* Physician-Assigned Tasks - REAL DATA FROM API */}
+      {!loading && assignedTasks.length > 0 && (
         <section className="rounded-xl bg-surface-lowest shadow-[0_8px_32px_rgba(25,28,30,0.04)] backdrop-blur-md overflow-hidden">
           <div className="flex items-center justify-between bg-surface px-6 py-4 border-b border-surface-dim/30">
             <h2 className="text-lg font-bold text-primary">Assigned Tasks</h2>
@@ -67,138 +102,96 @@ export default function NurseDashboardPage() {
             </span>
           </div>
           <div className="divide-y divide-surface-low">
-            {assignedTasks.map((task: any) => (
-              <div key={task.id} className="p-6 hover:bg-surface transition-colors duration-200">
-                <div className="flex items-start justify-between gap-4 mb-3">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <h3 className="text-base font-bold text-primary">{task.task}</h3>
-                      {task.acknowledged && (
-                        <CheckCircle2 className="size-4 text-green-600 flex-shrink-0" />
-                      )}
+            {assignedTasks.map((task: any) => {
+              const formatted = formatTask(task);
+              return (
+                <div key={task.id} className="p-6 hover:bg-surface transition-colors duration-200">
+                  <div className="flex items-start justify-between gap-4 mb-3">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-2">
+                        <h3 className="text-base font-bold text-primary">{formatted.patientName}</h3>
+                        {task.acknowledged && (
+                          <CheckCircle2 className="size-4 text-green-600 flex-shrink-0" />
+                        )}
+                      </div>
+                      <p className="text-sm text-on-surface-variant">
+                        Task: <span className="font-semibold">{task.title}</span>
+                      </p>
+                      <p className="text-xs text-on-surface-variant mt-1">
+                        Assigned by: {formatted.createdBy}
+                      </p>
                     </div>
-                    <p className="text-sm text-on-surface-variant">
-                      Patient: <span className="font-semibold text-on-surface">{task.patientName}</span>
-                    </p>
-                    <p className="text-xs text-on-surface-variant mt-1">
-                      Assigned by: {task.createdBy}
-                    </p>
-                  </div>
-                  <div className="flex flex-col items-end gap-2">
-                    <div className={`font-bold text-sm px-3 py-1 rounded-full ${
-                      task.priority === "Critical" ? "bg-error/20 text-error" : "bg-secondary/20 text-secondary"
-                    }`}>
-                      {task.priority}
-                    </div>
-                    <div className="flex items-center gap-1 text-xs font-semibold">
-                      <Clock className="size-3.5" />
-                      {task.due}
-                    </div>
-                  </div>
-                </div>
-                <div className="flex items-center justify-between mt-4 pt-4 border-t border-surface-low">
-                  <div className="text-xs">
-                    {task.acknowledged ? (
-                      <span className="text-green-700 font-semibold">
-                        ✓ Acknowledged at {task.acknowledgmentTime}
+                    <div className="flex flex-col items-end gap-2">
+                      <StatusBadge
+                        label={formatted.priority}
+                        tone={formatted.priority === "Critical" ? "danger" : "warning"}
+                      />
+                      <span className="text-xs font-semibold text-on-surface-variant">
+                        Due: {formatted.dueDate}
                       </span>
-                    ) : (
-                      <span className="text-on-surface-variant">Awaiting acknowledgment</span>
-                    )}
+                    </div>
                   </div>
-                  {!task.acknowledged && (
-                    <Button className="text-xs font-bold uppercase bg-primary text-primary-foreground hover:opacity-90 shadow-none">
-                      Acknowledge
-                    </Button>
-                  )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </section>
       )}
 
-      <section className="grid grid-cols-12 gap-6">
-        <article className="col-span-12 overflow-hidden rounded-xl bg-surface-lowest shadow-[0_8px_32px_rgba(25,28,30,0.04)] lg:col-span-8 backdrop-blur-md">
-          <div className="flex items-center justify-between bg-surface px-6 py-4 border-b border-surface-dim/30">
-            <h2 className="text-lg font-bold text-primary">Active Patient Queue</h2>
+      {loading && (
+        <div className="rounded-xl bg-surface-lowest shadow-[0_8px_32px_rgba(25,28,30,0.04)] backdrop-blur-md p-6">
+          <p className="text-sm text-on-surface-variant">Loading assigned tasks...</p>
+        </div>
+      )}
+
+      {error && (
+        <div className="rounded-xl bg-surface-lowest shadow-[0_8px_32px_rgba(25,28,30,0.04)] backdrop-blur-md p-6">
+          <p className="text-sm text-red-500">Error: {error}</p>
+        </div>
+      )}
+
+      {!loading && assignedTasks.length === 0 && !error && (
+        <div className="rounded-xl bg-surface-lowest shadow-[0_8px_32px_rgba(25,28,30,0.04)] backdrop-blur-md p-6">
+          <p className="text-sm text-on-surface-variant">No tasks assigned at this time.</p>
+        </div>
+      )}
+
+      <section className="grid grid-cols-1 gap-8 md:grid-cols-2">
+        <article className="rounded-xl bg-surface-lowest shadow-[0_8px_32px_rgba(25,28,30,0.04)] backdrop-blur-md p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <AlertTriangle className="size-5 text-secondary" />
+            <h2 className="text-lg font-bold text-on-surface">Alert Queue</h2>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[720px] text-left">
-              <thead className="bg-surface-low text-[10px] uppercase tracking-widest text-on-surface-variant">
-                <tr>
-                  <th className="px-6 py-3">Patient Identity</th>
-                  <th className="px-6 py-3">Cycle Stage</th>
-                  <th className="px-6 py-3">Next Action Needed</th>
-                  <th className="px-6 py-3 text-right">Priority</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-surface-low bg-surface-lowest">
-                {nurseQueue.map((row) => (
-                  <tr key={row.id} className="hover:bg-surface transition-colors duration-200">
-                    <td className="px-6 py-4">
-                      <Link href={`/nurse/patient/${row.id}`} className="block text-sm font-bold text-primary hover:underline">
-                        {row.name}
-                      </Link>
-                      <p className="text-[10px] font-medium uppercase tracking-widest text-on-surface-variant">
-                        ID: #{row.id}
-                      </p>
-                    </td>
-                    <td className="px-6 py-4 text-xs font-semibold text-on-surface">{row.stage}</td>
-                    <td className="px-6 py-4 text-xs text-on-surface-variant">{row.action}</td>
-                    <td className="px-6 py-4 text-right">
-                      {row.priority === "High" ? (
-                        <Flag className="ml-auto size-4 fill-error text-error" />
-                      ) : (
-                        <Flag className="ml-auto size-4 text-on-surface-variant/40" />
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="space-y-3">
+            {nurseAlerts.map((alert) => (
+              <div
+                key={alert.id}
+                className="p-3 rounded-lg border-l-2 border-secondary bg-secondary/5 text-sm text-on-surface"
+              >
+                <p className="font-semibold">{alert.title}</p>
+                <p className="text-xs text-on-surface-variant mt-1">{alert.patientName} - {alert.source}</p>
+              </div>
+            ))}
           </div>
         </article>
 
-        <aside className="col-span-12 space-y-5 lg:col-span-4">
-          <article className="rounded-xl bg-error/10 p-5 text-error shadow-[0_8px_32px_rgba(186,26,26,0.04)]">
-            <h3 className="mb-4 flex items-center gap-2 text-sm font-black uppercase tracking-wider">
-              <AlertTriangle className="size-4" />
-              Clinical Alerts
-            </h3>
-            <div className="space-y-3">
-              {nurseAlerts.map((alert) => (
-                <div key={alert.id} className="rounded-lg border-l-[3px] border-error bg-surface-lowest p-3 relative shadow-sm">
-                  <p className="text-xs font-bold text-error">{alert.title}</p>
-                  <p className="mt-1 text-[11px] leading-relaxed text-on-surface">{alert.body}</p>
+        <article className="rounded-xl bg-surface-lowest shadow-[0_8px_32px_rgba(25,28,30,0.04)] backdrop-blur-md p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Clock className="size-5 text-tertiary" />
+            <h2 className="text-lg font-bold text-on-surface">Timeline</h2>
+          </div>
+          <div className="space-y-3">
+            {nurseTimeline.map((item) => (
+              <div key={item.id} className="flex gap-3">
+                <div className="w-2 h-2 rounded-full bg-tertiary mt-2 flex-shrink-0" />
+                <div className="text-sm">
+                  <p className="font-semibold text-on-surface">{item.title}</p>
+                  <p className="text-xs text-on-surface-variant">{item.time}</p>
                 </div>
-              ))}
-            </div>
-          </article>
-
-          <article className="rounded-xl bg-surface-lowest p-5 shadow-[0_8px_32px_rgba(25,28,30,0.04)]">
-            <div className="mb-5 flex items-center justify-between">
-              <h3 className="text-base font-bold text-primary">Timeline</h3>
-              <StatusBadge label="Today" />
-            </div>
-            <div className="space-y-4 border-l-[3px] border-surface-low pl-5 ml-1">
-              {nurseTimeline.map((item) => (
-                <div key={item.id} className="relative">
-                  <span
-                    className={`absolute -left-[27px] top-1 size-3 rounded-full border-2 border-surface-lowest ${
-                      item.active ? "bg-secondary" : "bg-surface-dim"
-                    }`}
-                  />
-                  <p className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">
-                    {item.time} — {item.place}
-                  </p>
-                  <p className="text-sm font-bold text-on-surface">{item.title}</p>
-                  <p className="text-xs text-on-surface-variant">{item.patient}</p>
-                </div>
-              ))}
-            </div>
-          </article>
-        </aside>
+              </div>
+            ))}
+          </div>
+        </article>
       </section>
     </div>
   );

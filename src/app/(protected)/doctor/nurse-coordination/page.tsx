@@ -1,3 +1,5 @@
+"use client";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { coordinationTasks } from "@/lib/mock-doctor-data";
 import { CheckCircle2, AlertTriangle, Clock } from "lucide-react";
@@ -74,7 +76,83 @@ function TaskCard({
   );
 }
 
+// Nurse and patient mappings for UI
+const NURSES = [
+  { id: "nurse_001", name: "Nurse Elena Rodriguez" },
+  { id: "nurse_002", name: "Nurse James Wilson" },
+  { id: "nurse_003", name: "Nurse Sarah Chen" },
+];
+
+const PATIENTS = [
+  { id: "patient_001", name: "Patient #8829 - Miller, A." },
+  { id: "patient_002", name: "Patient #9102 - Tanaka, K." },
+  { id: "patient_003", name: "Patient #7741 - Smith, L." },
+];
+
+const TASK_TYPES = [
+  { id: "hcg_injection", name: "Oocyte Trigger Injection - HCG" },
+  { id: "bloodwork", name: "Bloodwork Collection" },
+  { id: "ultrasound", name: "Ultrasound Assessment" },
+];
+
 export default function DoctorNurseCoordinationPage() {
+  const [selectedNurse, setSelectedNurse] = useState("nurse_001");
+  const [selectedPatient, setSelectedPatient] = useState("patient_001");
+  const [selectedTask, setSelectedTask] = useState("hcg_injection");
+  const [dueDate, setDueDate] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
+
+  const handleAssignTask = async () => {
+    try {
+      setIsLoading(true);
+      setErrorMessage("");
+      setSuccessMessage("");
+
+      if (!selectedNurse || !selectedPatient || !selectedTask || !dueDate) {
+        setErrorMessage("Please fill in all fields");
+        return;
+      }
+
+      const response = await fetch("/api/doctor/tasks", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          patientId: selectedPatient,
+          assignedToNurseId: selectedNurse,
+          title: TASK_TYPES.find((t) => t.id === selectedTask)?.name || "Task",
+          taskType: selectedTask,
+          priority: "HIGH",
+          dueDate: dueDate,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to assign task");
+      }
+
+      const data = await response.json();
+      setSuccessMessage("✅ Task assigned successfully!");
+      
+      // Reset form
+      setSelectedNurse("nurse_001");
+      setSelectedPatient("patient_001");
+      setSelectedTask("hcg_injection");
+      setDueDate("");
+
+      // Clear success message after 3 seconds
+      setTimeout(() => setSuccessMessage(""), 3000);
+    } catch (err: any) {
+      setErrorMessage("❌ " + (err.message || "Error assigning task"));
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const allTasks = [
     ...coordinationTasks.pending,
     ...coordinationTasks.progress,
@@ -134,31 +212,66 @@ export default function DoctorNurseCoordinationPage() {
 
       <section className="grid grid-cols-12 gap-6">
         <article className="col-span-12 space-y-6 bg-surface-lowest p-8 shadow-[0_8px_32px_rgba(25,28,30,0.04)] lg:col-span-9 backdrop-blur-md rounded-xl">
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-            <select className="rounded-lg bg-surface border border-surface-dim/50 p-3 text-sm font-medium text-on-surface focus:outline-none focus:ring-2 focus:ring-primary shadow-sm">
-              <option>Nurse Elena Rodriguez</option>
-              <option>Nurse James Wilson</option>
-              <option>Nurse Sarah Chen</option>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-5">
+            <select 
+              value={selectedNurse}
+              onChange={(e) => setSelectedNurse(e.target.value)}
+              className="rounded-lg bg-surface border border-surface-dim/50 p-3 text-sm font-medium text-on-surface focus:outline-none focus:ring-2 focus:ring-primary shadow-sm"
+            >
+              {NURSES.map((nurse) => (
+                <option key={nurse.id} value={nurse.id}>
+                  {nurse.name}
+                </option>
+              ))}
             </select>
-            <select className="rounded-lg bg-surface border border-surface-dim/50 p-3 text-sm font-medium text-on-surface focus:outline-none focus:ring-2 focus:ring-primary shadow-sm">
-              <option>Patient #8829 - Miller, A.</option>
-              <option>Patient #9102 - Tanaka, K.</option>
-              <option>Patient #7741 - Smith, L.</option>
+            <select 
+              value={selectedPatient}
+              onChange={(e) => setSelectedPatient(e.target.value)}
+              className="rounded-lg bg-surface border border-surface-dim/50 p-3 text-sm font-medium text-on-surface focus:outline-none focus:ring-2 focus:ring-primary shadow-sm"
+            >
+              {PATIENTS.map((patient) => (
+                <option key={patient.id} value={patient.id}>
+                  {patient.name}
+                </option>
+              ))}
             </select>
-            <select className="rounded-lg bg-surface border border-surface-dim/50 p-3 text-sm font-medium text-on-surface focus:outline-none focus:ring-2 focus:ring-primary shadow-sm">
-              <option>Oocyte Trigger Injection - HCG</option>
-              <option>Bloodwork Collection</option>
-              <option>Ultrasound Assessment</option>
+            <select 
+              value={selectedTask}
+              onChange={(e) => setSelectedTask(e.target.value)}
+              className="rounded-lg bg-surface border border-surface-dim/50 p-3 text-sm font-medium text-on-surface focus:outline-none focus:ring-2 focus:ring-primary shadow-sm"
+            >
+              {TASK_TYPES.map((task) => (
+                <option key={task.id} value={task.id}>
+                  {task.name}
+                </option>
+              ))}
             </select>
             <input 
-              className="rounded-lg bg-surface border border-surface-dim/50 p-3 text-sm font-medium text-on-surface focus:outline-none focus:ring-2 focus:ring-primary shadow-sm md:col-span-2" 
+              value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)}
+              className="rounded-lg bg-surface border border-surface-dim/50 p-3 text-sm font-medium text-on-surface focus:outline-none focus:ring-2 focus:ring-primary shadow-sm" 
               type="datetime-local" 
               placeholder="Set deadline"
             />
-            <Button className="rounded-lg bg-gradient-to-r from-primary to-primary-container text-primary-foreground hover:opacity-90 shadow-none font-bold uppercase text-xs tracking-wider">
-              Assign Task
+            <Button 
+              onClick={handleAssignTask}
+              disabled={isLoading}
+              className="rounded-lg bg-gradient-to-r from-primary to-primary-container text-primary-foreground hover:opacity-90 shadow-none font-bold uppercase text-xs tracking-wider disabled:opacity-50"
+            >
+              {isLoading ? "Assigning..." : "Assign Task"}
             </Button>
           </div>
+
+          {successMessage && (
+            <div className="p-3 rounded-lg bg-green-100 text-green-800 text-sm font-semibold">
+              {successMessage}
+            </div>
+          )}
+          {errorMessage && (
+            <div className="p-3 rounded-lg bg-red-100 text-red-800 text-sm font-semibold">
+              {errorMessage}
+            </div>
+          )}
         </article>
 
         <article className="col-span-12 flex min-h-[300px] flex-col justify-between bg-surface-lowest p-8 text-on-surface lg:col-span-3 rounded-xl shadow-[0_8px_32px_rgba(25,28,30,0.04)] backdrop-blur-md">
