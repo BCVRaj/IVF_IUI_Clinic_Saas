@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
         .eq("auth_id", authData.user.id)
         .single();
 
-      if (profile?.role !== "DOCTOR") {
+      if (!profile || profile.role !== "DOCTOR") {
         return NextResponse.json(
           { error: "Only doctors can create tasks" },
           { status: 403 }
@@ -196,7 +196,7 @@ export async function GET(request: NextRequest) {
         .eq("auth_id", authData.user.id)
         .single();
 
-      if (profile?.role !== "DOCTOR") {
+      if (!profile || profile.role !== "DOCTOR") {
         return NextResponse.json(
           { error: "Only doctors can access this endpoint" },
           { status: 403 }
@@ -263,7 +263,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const shaped: TaskRow[] = (tasks || []).map((t) => ({
+    const shaped: TaskRow[] = (tasks || []).map((t: any) => ({
       ...t,
       patient: (t as TaskRow).patient || (t as TaskRow).patients || null,
       nurse: (t as TaskRow).nurse || (t as TaskRow).user_profiles || null,
