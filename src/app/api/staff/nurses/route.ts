@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase";
 
 const fallbackNurses = [
-  { id: "nurse-demo-1", first_name: "Demo", last_name: "Nurse", role: "NURSE" },
+  { id: "11111111-1111-1111-1111-111111111111", first_name: "Demo", last_name: "Nurse", role: "NURSE" },
 ];
 
 export async function GET() {

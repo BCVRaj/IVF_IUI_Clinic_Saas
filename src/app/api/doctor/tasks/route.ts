@@ -24,7 +24,7 @@ type TaskRow = {
 };
 
 const fallbackDoctorProfile: BasicProfile = {
-  id: "doctor-demo-1",
+  id: "00000000-0000-0000-0000-000000000000",
   role: "DOCTOR",
   first_name: "Demo",
   last_name: "Doctor",
