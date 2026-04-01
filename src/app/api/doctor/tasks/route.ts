@@ -92,7 +92,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { data: nurseProfile } = await supabaseServer
+    if (!doctorProfile) return NextResponse.json({ error: "Unauthorized" }, { status: 401 }); const { data: nurseProfile } = await supabaseServer
       .from("user_profiles")
       .select("*")
       .eq("id", assignedToNurseId)
@@ -221,7 +221,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const { data: tasks, error } = await supabaseServer
+    if (!doctorProfile) return NextResponse.json({ error: "Unauthorized" }, { status: 401 }); const { data: tasks, error } = await supabaseServer
       .from("coordination_tasks")
       .select(`
         id,
