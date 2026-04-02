@@ -30,7 +30,7 @@ export async function GET() {
       );
     }
 
-    return NextResponse.json({ data: data || [] });
+    return NextResponse.json({ data: (data && data.length > 0) ? data : (isDevMode ? fallbackNurses : []) });
   } catch (error) {
     console.error("Unexpected error loading nurses", error);
     return NextResponse.json(

@@ -1,6 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase";
 
+const fallbackPatients = [
+  {
+    id: ""22222222-2222-2222-2222-222222222222"",
+    first_name: ""Demo"",
+    last_name: ""Patient"",
+    email: ""demo.patient@example.com"",
+    phone: ""555-010-0001"",
+    date_of_birth: ""1990-01-01"",
+    age: 34,
+    gender: ""FEMALE"",
+    blood_type: ""O+""
+  }
+];
+
 export async function GET(request: NextRequest) {
   try {
     const token = request.cookies.get("sb-auth-token")?.value;
