@@ -1,17 +1,47 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   doctorAlerts,
-  doctorSchedule,
   doctorStats,
 } from "@/lib/mock-doctor-data";
 import Link from 'next/link';
 
+type Patient = {
+  id: string;
+  first_name: string;
+  last_name: string;
+  email?: string;
+  gender?: string;
+  age?: number;
+};
+
 export default function DoctorDashboardPage() {
+  const [patients, setPatients] = useState<Patient[]>([]);
+  const [patientsLoading, setPatientsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchPatients = async () => {
+      try {
+        const res = await fetch("/api/doctor/patients");
+        if (!res.ok) return;
+        const json = await res.json();
+        setPatients(json.data || []);
+      } catch (err) {
+        console.error("Failed to load patients:", err);
+      } finally {
+        setPatientsLoading(false);
+      }
+    };
+    fetchPatients();
+  }, []);
+
   return (
     <div className="space-y-10 bg-background text-on-surface">
       <div>
         <h2 className="text-3xl font-bold tracking-tight">Clinical Overview</h2>
-        <p className="text-sm text-on-surface-variant">Tuesday, Oct 24 • Laboratory Operations Active</p>
+        <p className="text-sm text-on-surface-variant">Laboratory Operations Active</p>
       </div>
 
       <section className="grid grid-cols-1 gap-6 md:grid-cols-4">
@@ -41,7 +71,7 @@ export default function DoctorDashboardPage() {
       <section className="grid grid-cols-1 gap-8 lg:grid-cols-12">
         <div className="space-y-6 lg:col-span-8">
           <div className="flex items-center justify-between">
-            <h3 className="text-xl font-bold">Today&apos;s Patient Schedule</h3>
+            <h3 className="text-xl font-bold">Patient List</h3>
             <div className="flex gap-2">
               <Button variant="secondary" className="rounded-md text-[11px] uppercase tracking-wider bg-surface-lowest border border-outline-variant/15 text-on-surface hover:bg-surface-low shadow-none">
                 Filter
@@ -57,33 +87,46 @@ export default function DoctorDashboardPage() {
               <thead>
                 <tr className="bg-surface-low text-[10px] uppercase tracking-widest text-on-surface-variant">
                   <th className="px-6 py-4">Patient Name</th>
-                  <th className="px-6 py-4">Cycle Day</th>
-                  <th className="px-6 py-4">Stage</th>
-                  <th className="px-6 py-4">Last Scan</th>
+                  <th className="px-6 py-4">Patient ID</th>
+                  <th className="px-6 py-4">Gender</th>
+                  <th className="px-6 py-4">Age</th>
                   <th className="px-6 py-4 text-right" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-surface-low overflow-hidden">
-                {doctorSchedule.map((row) => (
-                  <tr key={row.id} className="hover:bg-surface transition-colors duration-200">
-                    <td className="px-6 py-5">
-                      <p className="font-bold">{row.name}</p>
-                      <p className="text-xs text-on-surface-variant">ID: {row.id}</p>
-                    </td>
-                    <td className="px-6 py-5 text-sm font-bold text-on-surface">{row.cycleDay}</td>
-                    <td className="px-6 py-5">
-                      <span className="bg-secondary/15 px-2 py-1 text-[10px] font-bold rounded-full uppercase text-secondary">
-                        {row.stage}
-                      </span>
-                    </td>
-                    <td className="px-6 py-5 text-sm text-on-surface-variant">{row.lastScan}</td>
-                    <td className="px-6 py-5 text-right">
-                      <Link href={`/doctor/ehr/${row.id}`} className="inline-block border border-outline-variant/15 px-3 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-wider text-on-surface hover:bg-surface hover:text-primary transition-colors duration-200">
-                        Open EHR
-                      </Link>
+                {patientsLoading ? (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-8 text-sm text-on-surface-variant text-center">
+                      Loading patients...
                     </td>
                   </tr>
-                ))}
+                ) : patients.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-8 text-sm text-on-surface-variant text-center">
+                      No patients assigned yet. Nurses can onboard new patients via the Nurse Portal.
+                    </td>
+                  </tr>
+                ) : (
+                  patients.map((patient) => (
+                    <tr key={patient.id} className="hover:bg-surface transition-colors duration-200">
+                      <td className="px-6 py-5">
+                        <p className="font-bold">{patient.first_name} {patient.last_name}</p>
+                        <p className="text-xs text-on-surface-variant">{patient.email}</p>
+                      </td>
+                      <td className="px-6 py-5 text-sm font-bold text-on-surface">{patient.id}</td>
+                      <td className="px-6 py-5 text-sm text-on-surface-variant">{patient.gender ?? "—"}</td>
+                      <td className="px-6 py-5 text-sm text-on-surface-variant">{patient.age ?? "—"}</td>
+                      <td className="px-6 py-5 text-right">
+                        <Link
+                          href={`/doctor/ehr/${patient.id}`}
+                          className="inline-block border border-outline-variant/15 px-3 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-wider text-on-surface hover:bg-surface hover:text-primary transition-colors duration-200"
+                        >
+                          Open EHR
+                        </Link>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -94,7 +137,7 @@ export default function DoctorDashboardPage() {
           {doctorAlerts.map((alert) => (
             <article
               key={alert.id}
-              className={`p-5 rounded-md relative overflow-hidden backdrop-blur-md shadow-[0_8px_32px_rgba(25,28,30,0.04)] bg-surface-lowest`}
+              className="p-5 rounded-md relative overflow-hidden backdrop-blur-md shadow-[0_8px_32px_rgba(25,28,30,0.04)] bg-surface-lowest"
             >
               <div className={`absolute left-0 top-0 bottom-0 w-1 ${alert.severity === 'critical' ? 'bg-error' : 'bg-tertiary'}`} />
               <p className={`text-[10px] font-extrabold uppercase tracking-widest ${alert.severity === 'critical' ? 'text-error' : 'text-tertiary'}`}>

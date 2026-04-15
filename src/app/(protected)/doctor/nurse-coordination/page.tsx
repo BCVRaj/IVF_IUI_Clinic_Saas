@@ -41,9 +41,11 @@ type CoordinationTask = {
 };
 
 const TASK_TYPES = [
-  { id: "hcg_injection", name: "Oocyte Trigger Injection - HCG" },
-  { id: "bloodwork", name: "Bloodwork Collection" },
-  { id: "ultrasound", name: "Ultrasound Assessment" },
+  { id: "MEDICATION", name: "Oocyte Trigger Injection - HCG" },
+  { id: "MONITORING", name: "Bloodwork & Monitoring" },
+  { id: "PROCEDURE", name: "Ultrasound Assessment" },
+  { id: "COMMUNICATION", name: "Patient Communication" },
+  { id: "FOLLOWUP", name: "Follow-up Check" },
 ];
 
 const formatName = (first?: string | null, last?: string | null, fallback = "") => {
@@ -132,7 +134,7 @@ export default function DoctorNurseCoordinationPage() {
   const [tasks, setTasks] = useState<CoordinationTask[]>([]);
   const [selectedNurse, setSelectedNurse] = useState("");
   const [selectedPatient, setSelectedPatient] = useState("");
-  const [selectedTask, setSelectedTask] = useState("hcg_injection");
+  const [selectedTask, setSelectedTask] = useState("MEDICATION");
   const [dueDate, setDueDate] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [tasksLoading, setTasksLoading] = useState(false);
@@ -258,7 +260,7 @@ export default function DoctorNurseCoordinationPage() {
 
       if (nurses.length > 0) setSelectedNurse(nurses[0].id);
       if (patients.length > 0) setSelectedPatient(patients[0].id);
-      setSelectedTask("hcg_injection");
+      setSelectedTask("MEDICATION");
       setDueDate("");
 
       setTimeout(() => setSuccessMessage(""), 3000);
@@ -284,13 +286,22 @@ export default function DoctorNurseCoordinationPage() {
 
   return (
     <div className="space-y-8 bg-background text-on-surface">
-      <header>
-        <h1 className="text-4xl font-extrabold tracking-tight text-primary">
-          Nurse Coordination
-        </h1>
-        <p className="mt-1 text-sm text-on-surface-variant">
-          Assign and monitor high-priority nursing workflow with real-time acknowledgment tracking.
-        </p>
+      <header className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-4xl font-extrabold tracking-tight text-primary">
+            Nurse Coordination
+          </h1>
+          <p className="mt-1 text-sm text-on-surface-variant">
+            Assign and monitor high-priority nursing workflow with real-time acknowledgment tracking.
+          </p>
+        </div>
+        <Button
+          variant="secondary"
+          onClick={() => { loadOptions(); loadTasks(); }}
+          className="mt-1 rounded-lg border border-outline-variant/15 bg-surface-lowest text-xs uppercase tracking-wider text-on-surface hover:bg-surface-low shadow-none"
+        >
+          Refresh
+        </Button>
       </header>
 
       <section className="grid grid-cols-1 gap-4 md:grid-cols-4">

@@ -66,7 +66,17 @@ export async function POST(request: NextRequest) {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
-      maxAge: 60 * 60 * 24 * 7, // 7 days
+      maxAge: 60 * 60 * 24 * 7,
+    });
+
+    // Set role cookie (readable by middleware for route protection)
+    response.cookies.set({
+      name: "sb-user-role",
+      value: profile?.role || "",
+      httpOnly: false,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 60 * 60 * 24 * 7,
     });
 
     return response;

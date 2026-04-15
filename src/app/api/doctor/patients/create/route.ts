@@ -12,8 +12,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { firstName, lastName, email, phone, dateOfBirth, gender, bloodType } =
-      await request.json();
+    const {
+      firstName,
+      lastName,
+      email,
+      phone,
+      dateOfBirth,
+      gender,
+      bloodType,
+      // Compliance / KYC fields (optional)
+      nartsrId,
+      idDocumentType,
+      idDocumentNumber,
+      medicalVisaStatus,
+      marriageCertVerified,
+    } = await request.json();
 
     // Validate required fields
     if (!firstName || !lastName || !email || !dateOfBirth) {
@@ -54,6 +67,12 @@ export async function POST(request: NextRequest) {
         date_of_birth: dateOfBirth,
         gender: gender || null,
         blood_type: bloodType || null,
+        // Compliance / KYC fields — all optional, fall back to null/false
+        nartsr_id: nartsrId || null,
+        id_document_type: idDocumentType || null,
+        id_document_number: idDocumentNumber || null,
+        medical_visa_status: medicalVisaStatus || null,
+        marriage_cert_verified: marriageCertVerified ?? false,
       })
       .select()
       .single();

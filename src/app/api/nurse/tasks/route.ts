@@ -49,20 +49,20 @@ export async function GET(request: NextRequest) {
         .from("coordination_tasks")
         .select(`
           *,
-          patient:patient_id (*),
-          creator:created_by (*)
+          patients!patient_id (id, first_name, last_name),
+          user_profiles!created_by (id, first_name, last_name)
         `)
         .eq("assigned_to", nurseProfileId)
         .order("created_at", { ascending: false });
 
       if (error) {
         console.error("Error fetching tasks:", error);
-        return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+        return NextResponse.json({ data: [], error: "Internal server error" }, { status: 500 });
       }
 
-      return NextResponse.json(tasks || []);
+      return NextResponse.json({ data: tasks || [] });
     } else {
-      return NextResponse.json([]);
+      return NextResponse.json({ data: [] });
     }
 
   } catch (error) {

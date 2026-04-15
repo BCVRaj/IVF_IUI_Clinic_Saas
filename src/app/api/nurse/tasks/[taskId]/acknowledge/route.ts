@@ -31,7 +31,7 @@ export async function PUT(
       const { data: profile, error: profileError } = await supabaseServer
         .from("user_profiles")
         .select("id")
-        .eq("user_id", authData.user.id)
+        .eq("auth_id", authData.user.id)
         .eq("role", "NURSE")
         .single();
 
@@ -74,7 +74,6 @@ export async function PUT(
       .update({
         acknowledged: true,
         acknowledged_at: new Date().toISOString(),
-        acknowledged_by: nurseProfileId,
       })
       .eq("id", taskId)
       .eq("assigned_to", nurseProfileId)

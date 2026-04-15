@@ -17,6 +17,12 @@ type FormState = {
   packageType: string;
   paymentPlan: string;
   eSignature: string;
+  // Compliance / KYC fields (Phase I)
+  nartsrId: string;
+  idDocumentType: string;
+  idDocumentNumber: string;
+  medicalVisaStatus: string;
+  marriageCertVerified: boolean;
 };
 
 const initialState: FormState = {
@@ -32,13 +38,22 @@ const initialState: FormState = {
   packageType: "Standard IVF",
   paymentPlan: "Monthly Installments",
   eSignature: "",
+  // Compliance / KYC fields (Phase I)
+  nartsrId: "",
+  idDocumentType: "Aadhar",
+  idDocumentNumber: "",
+  medicalVisaStatus: "Not Applicable",
+  marriageCertVerified: false,
 };
 
-const steps = ["Personal Details", "Financial Setup", "Review & Confirm"];
+const steps = ["Personal Details", "Financial Setup", "Regulatory Compliance", "Review & Confirm"];
 
 export function OnboardingWizard() {
   const [step, setStep] = useState(1);
   const [submitted, setSubmitted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [createdPatientId, setCreatedPatientId] = useState<string | null>(null);
   const [formData, setFormData] = useState<FormState>(initialState);
 
   const canSubmit = useMemo(() => {
@@ -55,12 +70,42 @@ export function OnboardingWizard() {
     setFormData((prev) => ({ ...prev, [key]: value }));
   }
 
+  async function handleSubmit() {
+    try {
+      setIsSubmitting(true);
+      setSubmitError(null);
+
+      const res = await fetch("/api/nurse/patients", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData),
+      });
+
+      const json = await res.json();
+
+      if (!res.ok) {
+        throw new Error(json.error || "Failed to create patient");
+      }
+
+      setCreatedPatientId(json.data?.id ?? null);
+      setSubmitted(true);
+    } catch (err: any) {
+      setSubmitError(err.message || "Error creating patient. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
   if (submitted) {
     return (
       <div className="rounded-xl bg-white p-8 shadow-sm">
         <h3 className="text-2xl font-extrabold text-[#1A237E]">Onboarding Complete</h3>
         <p className="mt-2 text-sm text-slate-600">
-          Couple registration has been captured and financial setup is confirmed.
+          Couple registration has been saved. Patient ID:{" "}
+          <span className="font-bold text-[#1A237E]">{createdPatientId ?? "assigned"}</span>
+        </p>
+        <p className="mt-1 text-xs text-slate-500">
+          The patient has been assigned to a doctor and will appear on the clinical dashboard.
         </p>
         <Button
           className="mt-5 rounded-lg bg-[#1A237E] hover:bg-[#111a63]"
@@ -68,6 +113,7 @@ export function OnboardingWizard() {
             setFormData(initialState);
             setStep(1);
             setSubmitted(false);
+            setCreatedPatientId(null);
           }}
         >
           Start New Onboarding
@@ -179,6 +225,71 @@ export function OnboardingWizard() {
 
       {step === 3 && (
         <div className="rounded-xl bg-white p-6 shadow-sm">
+          <h4 className="mb-5 text-lg font-bold text-[#1A237E]">Regulatory Compliance</h4>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div className="rounded-lg bg-slate-100 p-4 md:col-span-2">
+              <p className="mb-2 text-xs font-bold uppercase tracking-wider text-slate-500">NARTSR Enrollment ID</p>
+              <input
+                className="w-full rounded-lg bg-white p-3 text-sm"
+                placeholder="National Registry ID (leave blank if not yet assigned)"
+                value={formData.nartsrId}
+                onChange={(e) => update("nartsrId", e.target.value)}
+              />
+            </div>
+            <div className="rounded-lg bg-slate-100 p-4">
+              <p className="mb-2 text-xs font-bold uppercase tracking-wider text-slate-500">ID Document Type</p>
+              <select
+                className="w-full rounded-lg bg-white p-3 text-sm"
+                value={formData.idDocumentType}
+                onChange={(e) => update("idDocumentType", e.target.value)}
+              >
+                <option>Aadhar</option>
+                <option>PAN</option>
+                <option>Passport</option>
+              </select>
+            </div>
+            <div className="rounded-lg bg-slate-100 p-4">
+              <p className="mb-2 text-xs font-bold uppercase tracking-wider text-slate-500">Document Number</p>
+              <input
+                className="w-full rounded-lg bg-white p-3 text-sm"
+                placeholder="Enter document number"
+                value={formData.idDocumentNumber}
+                onChange={(e) => update("idDocumentNumber", e.target.value)}
+              />
+            </div>
+            <div className="rounded-lg bg-slate-100 p-4">
+              <p className="mb-2 text-xs font-bold uppercase tracking-wider text-slate-500">Medical Visa Status</p>
+              <select
+                className="w-full rounded-lg bg-white p-3 text-sm"
+                value={formData.medicalVisaStatus}
+                onChange={(e) => update("medicalVisaStatus", e.target.value)}
+              >
+                <option>Not Applicable</option>
+                <option>Valid</option>
+                <option>Expired</option>
+              </select>
+            </div>
+            <div className="flex items-start gap-3 rounded-lg bg-slate-100 p-4">
+              <input
+                id="marriageCert"
+                type="checkbox"
+                className="mt-1 h-4 w-4 accent-[#1A237E]"
+                checked={formData.marriageCertVerified}
+                onChange={(e) => update("marriageCertVerified", e.target.checked)}
+              />
+              <label htmlFor="marriageCert" className="cursor-pointer text-sm text-slate-700">
+                <span className="font-bold">Marriage Certificate Verified</span>
+                <span className="mt-0.5 block text-xs text-slate-500">
+                  Required by Indian ART (Regulation) Act for IVF treatment. Confirm the original document has been sighted.
+                </span>
+              </label>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {step === 4 && (
+        <div className="rounded-xl bg-white p-6 shadow-sm">
           <h4 className="mb-5 text-lg font-bold text-[#1A237E]">Review & Confirm</h4>
           <div className="grid grid-cols-1 gap-4 text-sm md:grid-cols-2">
             <div className="rounded-lg bg-slate-100 p-4">
@@ -200,22 +311,39 @@ export function OnboardingWizard() {
               <p>Payment Plan: {formData.paymentPlan}</p>
               <p>E-Signature: {formData.eSignature || "Pending"}</p>
             </div>
+            <div className="rounded-lg bg-slate-100 p-4 md:col-span-2">
+              <p className="font-bold text-slate-700">Regulatory Summary</p>
+              <p>NARTSR ID: {formData.nartsrId || "Not assigned"}</p>
+              <p>ID Document: {formData.idDocumentType}{formData.idDocumentNumber ? ` — ${formData.idDocumentNumber}` : " (number pending)"}</p>
+              <p>Medical Visa: {formData.medicalVisaStatus}</p>
+              <p>Marriage Certificate: {formData.marriageCertVerified ? "Verified" : "Not verified"}</p>
+            </div>
           </div>
         </div>
       )}
 
+      {submitError && (
+        <div className="rounded-lg bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+          {submitError}
+        </div>
+      )}
+
       <div className="flex items-center justify-between border-t border-slate-200 pt-6">
-        <Button variant="secondary" className="rounded-lg" onClick={() => setStep((s) => Math.max(1, s - 1))} disabled={step === 1}>
+        <Button variant="secondary" className="rounded-lg" onClick={() => setStep((s) => Math.max(1, s - 1))} disabled={step === 1 || isSubmitting}>
           Previous
         </Button>
 
-        {step < 3 ? (
-          <Button className="rounded-lg bg-[#1A237E] hover:bg-[#111a63]" onClick={() => setStep((s) => Math.min(3, s + 1))}>
+        {step < 4 ? (
+          <Button className="rounded-lg bg-[#1A237E] hover:bg-[#111a63]" onClick={() => setStep((s) => Math.min(4, s + 1))}>
             Next Step
           </Button>
         ) : (
-          <Button className="rounded-lg bg-[#1A237E] hover:bg-[#111a63]" disabled={!canSubmit} onClick={() => setSubmitted(true)}>
-            Confirm & Create Profile
+          <Button
+            className="rounded-lg bg-[#1A237E] hover:bg-[#111a63]"
+            disabled={!canSubmit || isSubmitting}
+            onClick={handleSubmit}
+          >
+            {isSubmitting ? "Saving..." : "Confirm & Create Profile"}
           </Button>
         )}
       </div>

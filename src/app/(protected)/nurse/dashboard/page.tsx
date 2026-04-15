@@ -1,13 +1,12 @@
 "use client";
-import { useEffect, useState } from "react";
-import { AlertTriangle, Flag, CheckCircle2, Clock } from "lucide-react";
+import { useEffect, useState, useCallback } from "react";
+import { AlertTriangle, CheckCircle2, Clock } from "lucide-react";
 import Link from 'next/link';
 
 import { StatusBadge } from "@/components/patient/status-badge";
 import { Button } from "@/components/ui/button";
 import {
   nurseAlerts,
-  nurseQueue,
   nurseStats,
   nurseTimeline,
 } from "@/lib/mock-nurse-data";
@@ -16,42 +15,67 @@ export default function NurseDashboardPage() {
   const [assignedTasks, setAssignedTasks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchTasks = async () => {
-      try {
-        setLoading(true);
-        const response = await fetch("/api/nurse/tasks");
-        if (!response.ok) {
-          throw new Error("Failed to fetch nurse tasks");
-        }
-        const data = await response.json();
-        setAssignedTasks(data.data || []);
-        setError(null);
-      } catch (err: any) {
-        console.error("Error fetching nurse tasks:", err);
-        setError(err.message || "Error loading tasks");
-        setAssignedTasks([]);
-      } finally {
-        setLoading(false);
+  const fetchTasks = useCallback(async () => {
+    try {
+      setLoading(true);
+      const response = await fetch("/api/nurse/tasks");
+      if (!response.ok) {
+        throw new Error("Failed to fetch nurse tasks");
       }
-    };
-
-    fetchTasks();
-    
-    // Auto-refresh every 10 seconds
-    const interval = setInterval(fetchTasks, 10000);
-    return () => clearInterval(interval);
+      const data = await response.json();
+      setAssignedTasks(data.data || []);
+      setError(null);
+    } catch (err: any) {
+      console.error("Error fetching nurse tasks:", err);
+      setError(err.message || "Error loading tasks");
+      setAssignedTasks([]);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  // Format task data from API response
+  useEffect(() => {
+    fetchTasks();
+    const interval = setInterval(fetchTasks, 10000);
+    return () => clearInterval(interval);
+  }, [fetchTasks]);
+
+  const acknowledgeTask = async (taskId: string) => {
+    try {
+      setActionLoading(taskId + "-ack");
+      const res = await fetch(`/api/nurse/tasks/${taskId}/acknowledge`, { method: "PUT" });
+      if (!res.ok) throw new Error("Failed to acknowledge task");
+      await fetchTasks();
+    } catch (err: any) {
+      console.error("Acknowledge error:", err);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const completeTask = async (taskId: string) => {
+    try {
+      setActionLoading(taskId + "-complete");
+      const res = await fetch(`/api/nurse/tasks/${taskId}/complete`, { method: "PUT" });
+      if (!res.ok) throw new Error("Failed to complete task");
+      await fetchTasks();
+    } catch (err: any) {
+      console.error("Complete error:", err);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  // Format task data from API response — Supabase returns joined rows as objects, not arrays
   const formatTask = (task: any) => ({
     ...task,
-    patientName: task.patients?.[0] 
-      ? `${task.patients[0].first_name} ${task.patients[0].last_name}`
+    patientName: task.patients
+      ? `${task.patients.first_name ?? ""} ${task.patients.last_name ?? ""}`.trim() || "Unknown Patient"
       : "Unknown Patient",
-    createdBy: task.user_profiles?.[0]
-      ? `${task.user_profiles[0].first_name} ${task.user_profiles[0].last_name}`
+    createdBy: task.user_profiles
+      ? `${task.user_profiles.first_name ?? ""} ${task.user_profiles.last_name ?? ""}`.trim() || "Unknown Doctor"
       : "Unknown Doctor",
     priority: task.priority === "URGENT" || task.priority === "HIGH" ? "Critical" : "Normal",
     dueDate: task.due_date ? new Date(task.due_date).toLocaleDateString() : "N/A",
@@ -129,6 +153,34 @@ export default function NurseDashboardPage() {
                       <span className="text-xs font-semibold text-on-surface-variant">
                         Due: {formatted.dueDate}
                       </span>
+                      <div className="flex gap-2 mt-1">
+                        {!task.acknowledged && task.status !== "COMPLETED" && (
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            disabled={actionLoading === task.id + "-ack"}
+                            onClick={() => acknowledgeTask(task.id)}
+                            className="text-xs h-7 px-3"
+                          >
+                            {actionLoading === task.id + "-ack" ? "..." : "Acknowledge"}
+                          </Button>
+                        )}
+                        {task.status !== "COMPLETED" && (
+                          <Button
+                            size="sm"
+                            disabled={actionLoading === task.id + "-complete"}
+                            onClick={() => completeTask(task.id)}
+                            className="text-xs h-7 px-3 bg-green-600 hover:bg-green-700 text-white"
+                          >
+                            {actionLoading === task.id + "-complete" ? "..." : "Complete"}
+                          </Button>
+                        )}
+                        {task.status === "COMPLETED" && (
+                          <span className="text-xs font-semibold text-green-600 flex items-center gap-1">
+                            <CheckCircle2 className="size-3.5" /> Done
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>

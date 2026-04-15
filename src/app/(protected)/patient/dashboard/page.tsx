@@ -1,3 +1,6 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import { CalendarDays, MessageSquareText, Upload } from "lucide-react";
 
 import { CycleStepper } from "@/components/patient/cycle-stepper";
@@ -8,11 +11,44 @@ import {
   patientCycleSteps,
   patientRecentLabReports,
   patientUpcomingAppointment,
-  patientUser,
-  todaysMedications,
 } from "@/lib/mock-patient-data";
 
 export default function PatientDashboardPage() {
+  const [patient, setPatient] = useState<any>(null);
+  const [medications, setMedications] = useState<any[]>([]);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const [profileRes, medsRes] = await Promise.all([
+          fetch("/api/patient/profile"),
+          fetch("/api/patient/medications"),
+        ]);
+        if (profileRes.ok) {
+          const json = await profileRes.json();
+          setPatient(json.data || null);
+        }
+        if (medsRes.ok) {
+          const json = await medsRes.json();
+          setMedications(json.data || []);
+        }
+      } catch (_) {}
+    };
+    load();
+  }, []);
+
+  const firstName = patient?.first_name || "there";
+  const cycleName = patient?.medical_history?.packageType || "IVF Stimulation Protocol";
+
+  // Map API medication to MedicationCard props
+  const todayMeds = medications.slice(0, 3).map((m: any) => ({
+    id: m.id,
+    name: m.medication_name,
+    dose: m.dose,
+    time: m.frequency || "Daily",
+    status: m.medication_adherence?.[0]?.status === "TAKEN" ? "Taken" : "Pending",
+  }));
+
   return (
     <div className="space-y-8">
       <section className="rounded-2xl bg-white p-8 shadow-sm">
@@ -20,14 +56,13 @@ export default function PatientDashboardPage() {
           Current Status
         </p>
         <h1 className="text-3xl font-extrabold text-slate-900">
-          Good morning, {patientUser.name.split(" ")[0]}. You&apos;re making great progress.
+          Good morning, {firstName}. You&apos;re making great progress.
         </h1>
         <p className="mt-3 max-w-2xl text-sm text-slate-600">
-          Today marks day 8 of your stimulation phase. Keep following your
-          medication schedule and stay hydrated.
+          Keep following your medication schedule and stay hydrated.
         </p>
         <div className="mt-5 inline-flex rounded-full bg-emerald-100 px-4 py-2 text-xs font-bold text-emerald-800">
-          Active Cycle: {patientUser.cycleName}
+          Active Cycle: {cycleName}
         </div>
       </section>
 
@@ -49,14 +84,10 @@ export default function PatientDashboardPage() {
               <p className="text-sm text-slate-500">{patientUpcomingAppointment.weekday}</p>
             </div>
             <div className="ml-auto">
-              <Button variant="secondary" className="rounded-full">
-                Reschedule
-              </Button>
+              <Button variant="secondary" className="rounded-full">Reschedule</Button>
             </div>
           </div>
-          <p className="mt-4 text-sm font-semibold text-slate-700">
-            {patientUpcomingAppointment.doctor}
-          </p>
+          <p className="mt-4 text-sm font-semibold text-slate-700">{patientUpcomingAppointment.doctor}</p>
           <p className="text-sm text-slate-500">{patientUpcomingAppointment.specialty}</p>
         </article>
 
@@ -67,18 +98,12 @@ export default function PatientDashboardPage() {
           </div>
           <div className="space-y-3">
             {patientRecentLabReports.map((report) => (
-              <div
-                key={report.id}
-                className="flex items-center justify-between rounded-lg bg-slate-100 px-3 py-3"
-              >
+              <div key={report.id} className="flex items-center justify-between rounded-lg bg-slate-100 px-3 py-3">
                 <div>
                   <p className="text-sm font-bold">{report.name}</p>
                   <p className="text-xs text-slate-500">{report.date}</p>
                 </div>
-                <StatusBadge
-                  label={report.status}
-                  tone={report.status === "Ready" ? "success" : "neutral"}
-                />
+                <StatusBadge label={report.status} tone={report.status === "Ready" ? "success" : "neutral"} />
               </div>
             ))}
           </div>
@@ -89,11 +114,15 @@ export default function PatientDashboardPage() {
         <div className="mb-5 flex items-center justify-between">
           <h2 className="text-xl font-bold">Today&apos;s Medications</h2>
         </div>
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-          {todaysMedications.map((medication) => (
-            <MedicationCard key={medication.id} {...medication} />
-          ))}
-        </div>
+        {todayMeds.length > 0 ? (
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            {todayMeds.map((med) => (
+              <MedicationCard key={med.id} {...med} />
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-slate-500">No medications prescribed yet.</p>
+        )}
       </section>
 
       <section className="flex flex-wrap gap-3">

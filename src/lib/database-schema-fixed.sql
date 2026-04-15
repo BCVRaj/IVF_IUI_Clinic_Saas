@@ -35,6 +35,12 @@ CREATE TABLE IF NOT EXISTS patients (
   marital_status TEXT,
   medical_history JSONB DEFAULT '{}'::jsonb,
   allergies TEXT[],
+  -- Compliance / KYC fields (Phase I)
+  nartsr_id TEXT UNIQUE,
+  id_document_type TEXT CHECK (id_document_type IN ('AADHAAR', 'PAN', 'PASSPORT')),
+  id_document_number TEXT,
+  medical_visa_status TEXT,
+  marriage_cert_verified BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
 );

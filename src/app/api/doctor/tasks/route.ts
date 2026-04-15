@@ -2,6 +2,52 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase";
 
 type BasicProfile = { id: string; role?: string | null; first_name?: string | null; last_name?: string | null; auth_id?: string | null };
+
+// In dev mode, seed a demo nurse via auth.admin if none exist in user_profiles
+async function getOrCreateDemoNurse(): Promise<BasicProfile | null> {
+  // Check if any nurse already exists
+  const { data: existing } = await supabaseServer
+    .from("user_profiles")
+    .select("*")
+    .eq("role", "NURSE")
+    .limit(1)
+    .single();
+  if (existing) return existing;
+
+  // No nurses — create one via admin API
+  const demoEmail = "demo.nurse@clinic.internal";
+  let nurseAuthId: string | null = null;
+
+  // Try to create a new auth user
+  const { data: newAuth, error: authErr } = await supabaseServer.auth.admin.createUser({
+    email: demoEmail,
+    email_confirm: true,
+    user_metadata: { first_name: "Demo", last_name: "Nurse" },
+  });
+
+  if (authErr) {
+    // If the user already exists in auth but profile is missing, list users to get the id
+    const { data: list } = await supabaseServer.auth.admin.listUsers();
+    const found = list?.users?.find((u: any) => u.email === demoEmail);
+    nurseAuthId = found?.id ?? null;
+  } else {
+    nurseAuthId = newAuth?.user?.id ?? null;
+  }
+
+  if (!nurseAuthId) return null;
+
+  // Upsert the user_profile
+  const { data: profile } = await supabaseServer
+    .from("user_profiles")
+    .upsert(
+      { auth_id: nurseAuthId, first_name: "Demo", last_name: "Nurse", role: "NURSE" },
+      { onConflict: "auth_id" }
+    )
+    .select("*")
+    .single();
+
+  return profile ?? null;
+}
 type Patient = { id: string; first_name?: string | null; last_name?: string | null; email?: string | null; phone?: string | null; date_of_birth?: string | null; age?: number | null; gender?: string | null; blood_type?: string | null };
 type TaskRow = {
   id: string;
@@ -92,18 +138,36 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!doctorProfile) return NextResponse.json({ error: "Unauthorized" }, { status: 401 }); const { data: nurseProfile } = await supabaseServer
+    if (!doctorProfile) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    // Look up nurse profile — in dev mode, fall back to any available nurse if ID not found
+    let nurseProfile: BasicProfile | null = null;
+    const { data: nurseByIdData, error: nurseByIdError } = await supabaseServer
       .from("user_profiles")
       .select("*")
       .eq("id", assignedToNurseId)
+      .eq("role", "NURSE")
       .single();
 
-    if (!nurseProfile || nurseProfile.role !== "NURSE") {
+    if (nurseByIdData) {
+      nurseProfile = nurseByIdData;
+    } else if (isDevMode) {
+      // Fallback: find any nurse, or seed a demo nurse if none exist
+      if (nurseByIdError) {
+        console.warn("Nurse lookup by ID failed in dev mode, seeding fallback:", nurseByIdError.message);
+      }
+      nurseProfile = await getOrCreateDemoNurse();
+    }
+
+    if (!nurseProfile) {
       return NextResponse.json(
-        { error: "Invalid nurse ID" },
+        { error: "Invalid nurse ID — no nurse found. Ensure SUPABASE_SERVICE_ROLE_KEY is set." },
         { status: 400 }
       );
     }
+
+    // Use the resolved nurse ID (may differ from assignedToNurseId in dev fallback)
+    const resolvedNurseId = nurseProfile.id;
 
     const { data: patient } = await supabaseServer
       .from("patients")
@@ -123,7 +187,7 @@ export async function POST(request: NextRequest) {
       .insert({
         patient_id: patientId,
         created_by: doctorProfile.id,
-        assigned_to: assignedToNurseId,
+        assigned_to: resolvedNurseId,
         title,
         description: description || null,
         task_type: taskType,
