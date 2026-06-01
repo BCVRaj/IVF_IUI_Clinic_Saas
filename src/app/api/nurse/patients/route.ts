@@ -101,6 +101,7 @@ export async function POST(request: NextRequest) {
       packageType,
       paymentPlan,
       eSignature,
+      maritalStatus,
       // Compliance / KYC fields (Phase I — all optional)
       nartsrId,
       idDocumentType,
@@ -114,6 +115,40 @@ export async function POST(request: NextRequest) {
         { error: "Missing required fields: partner1FirstName, partner1LastName, eSignature" },
         { status: 400 }
       );
+    }
+
+    // NARTSR Legal Gate: Age Verification for Partner 1
+    if (partner1Dob) {
+      const diffMs = Date.now() - new Date(partner1Dob).getTime();
+      const ageDt = new Date(diffMs); 
+      const age = Math.abs(ageDt.getUTCFullYear() - 1970);
+      const isMale = partner1Sex === "M" || partner1Sex === "Male";
+      const minAge = 21;
+      const maxAge = isMale ? 55 : 50;
+
+      if (age < minAge || age > maxAge) {
+        return NextResponse.json(
+          { error: `Partner 1 does not meet legal age requirements for ART (Age: ${age}. Required: ${minAge}-${maxAge}).` },
+          { status: 400 }
+        );
+      }
+    }
+
+    // NARTSR Legal Gate: Age Verification for Partner 2
+    if (partner2Dob) {
+      const diffMs = Date.now() - new Date(partner2Dob).getTime();
+      const ageDt = new Date(diffMs); 
+      const age = Math.abs(ageDt.getUTCFullYear() - 1970);
+      const isMale = partner2Sex === "M" || partner2Sex === "Male";
+      const minAge = 21;
+      const maxAge = isMale ? 55 : 50;
+
+      if (age < minAge || age > maxAge) {
+        return NextResponse.json(
+          { error: `Partner 2 does not meet legal age requirements for ART (Age: ${age}. Required: ${minAge}-${maxAge}).` },
+          { status: 400 }
+        );
+      }
     }
 
     // Resolve nurse profile for audit log
@@ -169,6 +204,7 @@ export async function POST(request: NextRequest) {
         email,
         date_of_birth: partner1Dob || null,
         gender,
+        marital_status: maritalStatus || null,
         medical_history: {
           partner2: {
             first_name: partner2FirstName || null,
@@ -184,10 +220,14 @@ export async function POST(request: NextRequest) {
         },
         // Compliance / KYC fields (Phase I — all optional)
         nartsr_id: nartsrId || null,
-        id_document_type: idDocumentType || null,
+        id_document_type: ({ Aadhar: "AADHAAR", PAN: "PAN", Passport: "PASSPORT" } as Record<string, string>)[idDocumentType] ?? null,
         id_document_number: idDocumentNumber || null,
         medical_visa_status: medicalVisaStatus || null,
         marriage_cert_verified: marriageCertVerified ?? false,
+        // PENDING_VERIFICATION when document number + marriage cert are present (NARTSR optional)
+        onboarding_status: (idDocumentNumber && marriageCertVerified)
+          ? "PENDING_VERIFICATION"
+          : "INCOMPLETE",
       })
       .select()
       .single();
@@ -239,6 +279,58 @@ export async function POST(request: NextRequest) {
     );
   } catch (error: any) {
     console.error("Nurse patient onboarding error:", error);
+    return NextResponse.json(
+      { error: error.message || "Internal server error" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function GET(request: NextRequest) {
+  try {
+    const token = request.cookies.get("sb-auth-token")?.value;
+    const isDevMode = process.env.NODE_ENV === "development";
+    
+    let nurseProfileId: string | null = null;
+
+    if (token) {
+      const { data: authData } = await supabaseServer.auth.getUser(token);
+      if (authData?.user) {
+        const { data: profile } = await supabaseServer
+          .from("user_profiles")
+          .select("id")
+          .eq("auth_id", authData.user.id)
+          .eq("role", "NURSE")
+          .single();
+        nurseProfileId = profile?.id ?? null;
+      }
+    } else if (isDevMode) {
+      const { data: profile } = await supabaseServer
+        .from("user_profiles")
+        .select("id")
+        .eq("role", "NURSE")
+        .limit(1)
+        .single();
+      nurseProfileId = profile?.id ?? null;
+    }
+
+    if (!nurseProfileId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // For simplicity, return all patients assigned to this nurse, or just all patients
+    // since the nurse needs to see the queue. Let's return all patients for the clinic.
+    const { data: patients, error } = await supabaseServer
+      .from("patients")
+      .select("id, first_name, last_name, onboarding_status, nartsr_id, marriage_cert_verified");
+
+    if (error) {
+      throw error;
+    }
+
+    return NextResponse.json({ success: true, data: patients || [] });
+  } catch (error: any) {
+    console.error("Error fetching patients for nurse:", error);
     return NextResponse.json(
       { error: error.message || "Internal server error" },
       { status: 500 }

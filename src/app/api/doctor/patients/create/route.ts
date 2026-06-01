@@ -36,6 +36,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // NARTSR Legal Gate: Age Verification
+    const diffMs = Date.now() - new Date(dateOfBirth).getTime();
+    const ageDt = new Date(diffMs); 
+    const age = Math.abs(ageDt.getUTCFullYear() - 1970);
+    
+    // Default to Female limits if gender is not provided, or strict check if provided
+    const isMale = gender === "M" || gender === "Male";
+    const minAge = 21;
+    const maxAge = isMale ? 55 : 50;
+
+    if (age < minAge || age > maxAge) {
+      return NextResponse.json(
+        { error: `Patient does not meet legal age requirements for ART (Age: ${age}. Required: ${minAge}-${maxAge}).` },
+        { status: 400 }
+      );
+    }
+
     // Get current user
     const { data: authData } = await supabaseServer.auth.getUser(token);
     if (!authData.user) {
@@ -69,7 +86,7 @@ export async function POST(request: NextRequest) {
         blood_type: bloodType || null,
         // Compliance / KYC fields — all optional, fall back to null/false
         nartsr_id: nartsrId || null,
-        id_document_type: idDocumentType || null,
+        id_document_type: ({ Aadhar: "AADHAAR", PAN: "PAN", Passport: "PASSPORT" } as Record<string, string>)[idDocumentType] ?? null,
         id_document_number: idDocumentNumber || null,
         medical_visa_status: medicalVisaStatus || null,
         marriage_cert_verified: marriageCertVerified ?? false,

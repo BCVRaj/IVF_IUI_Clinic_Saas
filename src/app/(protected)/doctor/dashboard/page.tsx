@@ -15,7 +15,33 @@ type Patient = {
   email?: string;
   gender?: string;
   age?: number;
+  onboarding_status?: string;
 };
+
+function OnboardingBadge({ status }: { status?: string }) {
+  if (status === "CLEARED") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-green-700">
+        <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
+        Cleared
+      </span>
+    );
+  }
+  if (status === "PENDING_VERIFICATION") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-700">
+        <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+        Pending
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-red-700">
+      <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
+      Incomplete
+    </span>
+  );
+}
 
 export default function DoctorDashboardPage() {
   const [patients, setPatients] = useState<Patient[]>([]);
@@ -90,42 +116,48 @@ export default function DoctorDashboardPage() {
                   <th className="px-6 py-4">Patient ID</th>
                   <th className="px-6 py-4">Gender</th>
                   <th className="px-6 py-4">Age</th>
+                  <th className="px-6 py-4">Onboarding</th>
                   <th className="px-6 py-4 text-right" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-surface-low overflow-hidden">
                 {patientsLoading ? (
                   <tr>
-                    <td colSpan={5} className="px-6 py-8 text-sm text-on-surface-variant text-center">
+                    <td colSpan={6} className="px-6 py-8 text-sm text-on-surface-variant text-center">
                       Loading patients...
                     </td>
                   </tr>
                 ) : patients.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="px-6 py-8 text-sm text-on-surface-variant text-center">
+                    <td colSpan={6} className="px-6 py-8 text-sm text-on-surface-variant text-center">
                       No patients assigned yet. Nurses can onboard new patients via the Nurse Portal.
                     </td>
                   </tr>
                 ) : (
-                  patients.map((patient) => (
-                    <tr key={patient.id} className="hover:bg-surface transition-colors duration-200">
-                      <td className="px-6 py-5">
-                        <p className="font-bold">{patient.first_name} {patient.last_name}</p>
-                        <p className="text-xs text-on-surface-variant">{patient.email}</p>
-                      </td>
-                      <td className="px-6 py-5 text-sm font-bold text-on-surface">{patient.id}</td>
-                      <td className="px-6 py-5 text-sm text-on-surface-variant">{patient.gender ?? "—"}</td>
-                      <td className="px-6 py-5 text-sm text-on-surface-variant">{patient.age ?? "—"}</td>
-                      <td className="px-6 py-5 text-right">
-                        <Link
-                          href={`/doctor/ehr/${patient.id}`}
-                          className="inline-block border border-outline-variant/15 px-3 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-wider text-on-surface hover:bg-surface hover:text-primary transition-colors duration-200"
-                        >
-                          Open EHR
-                        </Link>
-                      </td>
-                    </tr>
-                  ))
+                  patients.map((patient) => {
+                    return (
+                      <tr key={patient.id} className="hover:bg-surface transition-colors duration-200">
+                        <td className="px-6 py-5">
+                          <p className="font-bold">{patient.first_name} {patient.last_name}</p>
+                          <p className="text-xs text-on-surface-variant">{patient.email}</p>
+                        </td>
+                        <td className="px-6 py-5 text-sm font-bold text-on-surface">{patient.id}</td>
+                        <td className="px-6 py-5 text-sm text-on-surface-variant">{patient.gender ?? "—"}</td>
+                        <td className="px-6 py-5 text-sm text-on-surface-variant">{patient.age ?? "—"}</td>
+                        <td className="px-6 py-5">
+                          <OnboardingBadge status={patient.onboarding_status} />
+                        </td>
+                        <td className="px-6 py-5 text-right">
+                          <Link
+                            href={`/doctor/ehr/${patient.id}`}
+                            className="inline-block border border-outline-variant/15 px-3 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-wider text-on-surface hover:bg-surface hover:text-primary transition-colors duration-200"
+                          >
+                            Open EHR
+                          </Link>
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>

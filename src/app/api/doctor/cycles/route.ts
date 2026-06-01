@@ -34,6 +34,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // NARTSR Legal Gate: Hard Block
+    // Check if patient has a NARTSR ID before allowing a cycle to start
+    const { data: nartsrRecord, error: nartsrError } = await supabaseServer
+      .from("nartsr_records")
+      .select("registry_id")
+      .eq("patient_id", patientId)
+      .single();
+
+    if (nartsrError || !nartsrRecord?.registry_id) {
+      return NextResponse.json(
+        { error: "Missing NARTSR ID - Cycle Start Blocked. Patient must complete regulatory enrollment." },
+        { status: 403 }
+      );
+    }
+
     const { data: cycle, error } = await supabaseServer
       .from("ivf_cycles")
       .insert({

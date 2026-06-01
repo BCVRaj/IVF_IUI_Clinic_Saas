@@ -93,6 +93,9 @@ export default function NurseDashboardPage() {
           </p>
         </div>
         <div className="flex gap-2">
+          <Button asChild variant="secondary" className="rounded-md border border-outline-variant/15 bg-surface-lowest text-[11px] uppercase tracking-wider text-on-surface hover:bg-surface-low shadow-none">
+            <Link href="/nurse/verification">Verification Queue</Link>
+          </Button>
           <Button variant="secondary" className="rounded-md border border-outline-variant/15 bg-surface-lowest text-[11px] uppercase tracking-wider text-on-surface hover:bg-surface-low shadow-none">
             Export Log
           </Button>

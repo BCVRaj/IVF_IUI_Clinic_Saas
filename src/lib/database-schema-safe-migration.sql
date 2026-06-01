@@ -1,5 +1,9 @@
--- IVF Clinic Database Schema for Supabase (FIXED)
--- Run this in Supabase SQL Editor after project creation
+-- ============================================================
+-- SAFE MIGRATION: Run this in Supabase SQL Editor
+-- This script creates ALL missing tables safely using
+-- CREATE TABLE IF NOT EXISTS and CREATE INDEX IF NOT EXISTS
+-- so it's safe to run even if some tables already exist.
+-- ============================================================
 
 -- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
@@ -20,10 +24,10 @@ CREATE TABLE IF NOT EXISTS user_profiles (
 );
 
 -- ============================================
--- 2. PATIENTS (Central Patient Hub)
+-- 2. PATIENTS
 -- ============================================
 CREATE TABLE IF NOT EXISTS patients (
-  id TEXT PRIMARY KEY DEFAULT 'IVF-' || LPAD(CAST(FLOOR(RANDOM()*9999) AS TEXT), 4, '0'),
+  id TEXT PRIMARY KEY,
   user_profile_id UUID NOT NULL UNIQUE REFERENCES user_profiles(id) ON DELETE CASCADE,
   first_name TEXT NOT NULL,
   last_name TEXT NOT NULL,
@@ -35,7 +39,6 @@ CREATE TABLE IF NOT EXISTS patients (
   marital_status TEXT,
   medical_history JSONB DEFAULT '{}'::jsonb,
   allergies TEXT[],
-  -- Compliance / KYC fields (Phase I)
   nartsr_id TEXT UNIQUE,
   id_document_type TEXT CHECK (id_document_type IN ('AADHAAR', 'PAN', 'PASSPORT')),
   id_document_number TEXT,
@@ -173,7 +176,7 @@ CREATE TABLE IF NOT EXISTS medical_results (
 );
 
 -- ============================================
--- 11. COORDINATION TASKS (Doctor -> Nurse)
+-- 11. COORDINATION TASKS
 -- ============================================
 CREATE TABLE IF NOT EXISTS coordination_tasks (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -213,7 +216,7 @@ CREATE TABLE IF NOT EXISTS patient_complaints (
 );
 
 -- ============================================
--- 13. CRYO SAMPLES (Frozen Embryos/Sperm/Eggs)
+-- 13. CRYO SAMPLES
 -- ============================================
 CREATE TABLE IF NOT EXISTS cryo_samples (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -233,7 +236,7 @@ CREATE TABLE IF NOT EXISTS cryo_samples (
 );
 
 -- ============================================
--- 14. ALERTS (System-wide Notifications)
+-- 14. ALERTS
 -- ============================================
 CREATE TABLE IF NOT EXISTS alerts (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -249,7 +252,7 @@ CREATE TABLE IF NOT EXISTS alerts (
 );
 
 -- ============================================
--- 15. AUDIT LOG (HIPAA Compliance)
+-- 15. AUDIT LOG
 -- ============================================
 CREATE TABLE IF NOT EXISTS audit_log (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -265,7 +268,7 @@ CREATE TABLE IF NOT EXISTS audit_log (
 );
 
 -- ============================================
--- 16. ACCESS LOGS (Security Tracking)
+-- 16. ACCESS LOGS
 -- ============================================
 CREATE TABLE IF NOT EXISTS access_logs (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -279,106 +282,8 @@ CREATE TABLE IF NOT EXISTS access_logs (
 );
 
 -- ============================================
--- INDEXES (Performance Optimization)
+-- 17. NARTSR RECORDS
 -- ============================================
-CREATE INDEX idx_patients_email ON patients(email);
-CREATE INDEX idx_patients_user_profile ON patients(user_profile_id);
-CREATE INDEX idx_ivf_cycles_patient ON ivf_cycles(patient_id);
-CREATE INDEX idx_ivf_cycles_status ON ivf_cycles(status);
-CREATE INDEX idx_medications_patient ON medications(patient_id);
-CREATE INDEX idx_medication_adherence_patient ON medication_adherence(patient_id, adherence_date);
-CREATE INDEX idx_coordination_tasks_assigned_to ON coordination_tasks(assigned_to);
-CREATE INDEX idx_coordination_tasks_patient ON coordination_tasks(patient_id);
-CREATE INDEX idx_coordination_tasks_status ON coordination_tasks(status);
-CREATE INDEX idx_patient_complaints_patient ON patient_complaints(patient_id);
-CREATE INDEX idx_alerts_patient ON alerts(patient_id);
-CREATE INDEX idx_audit_log_user ON audit_log(user_id);
-CREATE INDEX idx_access_logs_user ON access_logs(user_id);
-
--- ============================================
--- ROW LEVEL SECURITY (RLS) POLICIES
--- ============================================
-ALTER TABLE user_profiles ENABLE ROW LEVEL SECURITY;
-ALTER TABLE patients ENABLE ROW LEVEL SECURITY;
-ALTER TABLE ivf_cycles ENABLE ROW LEVEL SECURITY;
-ALTER TABLE medications ENABLE ROW LEVEL SECURITY;
-ALTER TABLE medication_adherence ENABLE ROW LEVEL SECURITY;
-ALTER TABLE appointments ENABLE ROW LEVEL SECURITY;
-ALTER TABLE medical_results ENABLE ROW LEVEL SECURITY;
-ALTER TABLE coordination_tasks ENABLE ROW LEVEL SECURITY;
-ALTER TABLE patient_complaints ENABLE ROW LEVEL SECURITY;
-ALTER TABLE alerts ENABLE ROW LEVEL SECURITY;
-
--- Patients can view their own profiles
-CREATE POLICY "Patients can view their own data" ON patients
-  FOR SELECT USING (
-    auth.uid() = (SELECT user_profile_id FROM patients WHERE id = patients.id)
-  );
-
--- Doctors can view patients they're assigned to
-CREATE POLICY "Doctors can view assigned patients" ON patients
-  FOR SELECT USING (
-    EXISTS (
-      SELECT 1 FROM doctor_patient_assignments
-      WHERE doctor_id = auth.uid() AND patient_id = patients.id
-    )
-  );
-
--- Nurses can view patients they're assigned to
-CREATE POLICY "Nurses can view assigned patients" ON patients
-  FOR SELECT USING (
-    EXISTS (
-      SELECT 1 FROM nurse_patient_assignments
-      WHERE nurse_id = auth.uid() AND patient_id = patients.id
-    )
-  );
-
--- Coordination tasks: assignees can view
-CREATE POLICY "Users can view assigned coordination tasks" ON coordination_tasks
-  FOR SELECT USING (
-    assigned_to = auth.uid() OR created_by = auth.uid()
-  );
-
--- Patient complaints: patient can view their own, nurse/doctor can view assigned
-CREATE POLICY "Patients can view their complaints" ON patient_complaints
-  FOR SELECT USING (
-    patient_id = (
-      SELECT id FROM patients WHERE user_profile_id = auth.uid()
-    )
-  );
-
-CREATE POLICY "Nurses can view patient complaints" ON patient_complaints
-  FOR SELECT USING (
-    EXISTS (
-      SELECT 1 FROM nurse_patient_assignments
-      WHERE nurse_id = auth.uid() AND patient_id = patient_complaints.patient_id
-    )
-  );
-
--- ============================================
--- VIEWS
--- ============================================
-CREATE OR REPLACE VIEW patient_dashboard_summary AS
-SELECT 
-  p.id,
-  p.first_name,
-  p.last_name,
-  p.email,
-  COUNT(DISTINCT ic.id) as total_cycles,
-  COUNT(DISTINCT CASE WHEN ic.status != 'COMPLETED' THEN ic.id END) as active_cycles,
-  COUNT(DISTINCT m.id) as total_medications,
-  COUNT(DISTINCT ct.id) as pending_tasks
-FROM patients p
-LEFT JOIN ivf_cycles ic ON p.id = ic.patient_id
-LEFT JOIN medications m ON p.id = m.patient_id
-LEFT JOIN coordination_tasks ct ON p.id = ct.patient_id AND ct.status = 'PENDING'
-GROUP BY p.id, p.first_name, p.last_name, p.email;
-
--- ============================================
--- 17. NARTSR ENROLLMENT & REGULATORY COMPLIANCE
--- ============================================
-
--- Track National Registry ID and Enrollment
 CREATE TABLE IF NOT EXISTS nartsr_records (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   patient_id TEXT NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
@@ -389,7 +294,9 @@ CREATE TABLE IF NOT EXISTS nartsr_records (
   updated_at TIMESTAMP DEFAULT NOW()
 );
 
--- Track Identity verification (Aadhaar, PAN, etc.)
+-- ============================================
+-- 17b. KYC DOCUMENTS
+-- ============================================
 CREATE TABLE IF NOT EXISTS kyc_documents (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   patient_id TEXT NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
@@ -402,7 +309,9 @@ CREATE TABLE IF NOT EXISTS kyc_documents (
   updated_at TIMESTAMP DEFAULT NOW()
 );
 
--- Track mandatory legal forms (Form 6, etc.)
+-- ============================================
+-- 17c. COMPLIANCE DOCUMENTS
+-- ============================================
 CREATE TABLE IF NOT EXISTS compliance_documents (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   patient_id TEXT NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
@@ -415,20 +324,24 @@ CREATE TABLE IF NOT EXISTS compliance_documents (
   updated_at TIMESTAMP DEFAULT NOW()
 );
 
--- Mandatory Pre-treatment Counseling Logs
+-- ============================================
+-- 17d. COUNSELING SESSIONS
+-- ============================================
 CREATE TABLE IF NOT EXISTS counseling_sessions (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   patient_id TEXT NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
   counselor_id UUID NOT NULL REFERENCES user_profiles(id) ON DELETE CASCADE,
   session_date TIMESTAMP NOT NULL DEFAULT NOW(),
-  topics_covered JSONB DEFAULT '[]'::jsonb, -- e.g., ["success_rates", "risks", "financial", "child_rights"]
+  topics_covered JSONB DEFAULT '[]'::jsonb,
   notes TEXT,
   signed_off BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
 );
 
--- Structured Infectious Disease Screening (IDS)
+-- ============================================
+-- 17e. IDS RESULTS
+-- ============================================
 CREATE TABLE IF NOT EXISTS ids_results (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   patient_id TEXT NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
@@ -443,15 +356,8 @@ CREATE TABLE IF NOT EXISTS ids_results (
   updated_at TIMESTAMP DEFAULT NOW()
 );
 
--- RLS for new tables
-ALTER TABLE nartsr_records ENABLE ROW LEVEL SECURITY;
-ALTER TABLE kyc_documents ENABLE ROW LEVEL SECURITY;
-ALTER TABLE compliance_documents ENABLE ROW LEVEL SECURITY;
-ALTER TABLE counseling_sessions ENABLE ROW LEVEL SECURITY;
-ALTER TABLE ids_results ENABLE ROW LEVEL SECURITY;
-
 -- ============================================
--- 18. CLINICAL HISTORY (Infertility type, duration, previous treatments)
+-- 18. CLINICAL HISTORY
 -- ============================================
 CREATE TABLE IF NOT EXISTS clinical_history (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -467,7 +373,7 @@ CREATE TABLE IF NOT EXISTS clinical_history (
 );
 
 -- ============================================
--- 19. SEMEN ANALYSIS (WHO standard parameters)
+-- 19. SEMEN ANALYSIS
 -- ============================================
 CREATE TABLE IF NOT EXISTS semen_analysis (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -492,7 +398,7 @@ CREATE TABLE IF NOT EXISTS semen_analysis (
 );
 
 -- ============================================
--- 20. SCAN RECORDS (Follicle growth, endometrial thickness)
+-- 20. SCAN RECORDS
 -- ============================================
 CREATE TABLE IF NOT EXISTS scan_records (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -512,7 +418,7 @@ CREATE TABLE IF NOT EXISTS scan_records (
 );
 
 -- ============================================
--- 21. STIMULATION DAILY LOG (Daily doses, hormones, USG findings)
+-- 21. STIMULATION DAILY LOG
 -- ============================================
 CREATE TABLE IF NOT EXISTS stimulation_daily_log (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -533,7 +439,7 @@ CREATE TABLE IF NOT EXISTS stimulation_daily_log (
 );
 
 -- ============================================
--- 22. OPU RECORDS (Egg retrieval stats)
+-- 22. OPU RECORDS
 -- ============================================
 CREATE TABLE IF NOT EXISTS opu_records (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -553,7 +459,7 @@ CREATE TABLE IF NOT EXISTS opu_records (
 );
 
 -- ============================================
--- 23. EMBRYOLOGY RECORDS (Culturing logs, fertilization check)
+-- 23. EMBRYOLOGY RECORDS
 -- ============================================
 CREATE TABLE IF NOT EXISTS embryology_records (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -571,7 +477,7 @@ CREATE TABLE IF NOT EXISTS embryology_records (
 );
 
 -- ============================================
--- 24. EMBRYO TRANSFER RECORDS (Transfer parameters)
+-- 24. EMBRYO TRANSFER RECORDS
 -- ============================================
 CREATE TABLE IF NOT EXISTS embryo_transfer_records (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -590,7 +496,7 @@ CREATE TABLE IF NOT EXISTS embryo_transfer_records (
 );
 
 -- ============================================
--- 25. CYCLE OUTCOMES (Post-transfer outcome tracking)
+-- 25. CYCLE OUTCOMES
 -- ============================================
 CREATE TABLE IF NOT EXISTS cycle_outcomes (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -611,7 +517,7 @@ CREATE TABLE IF NOT EXISTS cycle_outcomes (
 );
 
 -- ============================================
--- 26. BILLING RECORDS (Billing and payment tracking)
+-- 26. BILLING RECORDS
 -- ============================================
 CREATE TABLE IF NOT EXISTS billing_records (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -629,29 +535,59 @@ CREATE TABLE IF NOT EXISTS billing_records (
   updated_at TIMESTAMP DEFAULT NOW()
 );
 
--- ============================================
--- INDEXES FOR NEW TABLES
--- ============================================
-CREATE INDEX idx_clinical_history_patient ON clinical_history(patient_id);
-CREATE INDEX idx_semen_analysis_patient ON semen_analysis(patient_id);
-CREATE INDEX idx_scan_records_patient ON scan_records(patient_id);
-CREATE INDEX idx_scan_records_cycle ON scan_records(cycle_id);
-CREATE INDEX idx_stimulation_daily_log_cycle ON stimulation_daily_log(cycle_id);
-CREATE INDEX idx_stimulation_daily_log_patient ON stimulation_daily_log(patient_id);
-CREATE INDEX idx_opu_records_cycle ON opu_records(cycle_id);
-CREATE INDEX idx_opu_records_patient ON opu_records(patient_id);
-CREATE INDEX idx_embryology_records_cycle ON embryology_records(cycle_id);
-CREATE INDEX idx_embryology_records_patient ON embryology_records(patient_id);
-CREATE INDEX idx_embryo_transfer_records_cycle ON embryo_transfer_records(cycle_id);
-CREATE INDEX idx_embryo_transfer_records_patient ON embryo_transfer_records(patient_id);
-CREATE INDEX idx_cycle_outcomes_cycle ON cycle_outcomes(cycle_id);
-CREATE INDEX idx_cycle_outcomes_patient ON cycle_outcomes(patient_id);
-CREATE INDEX idx_billing_records_patient ON billing_records(patient_id);
-CREATE INDEX idx_billing_records_cycle ON billing_records(cycle_id);
+-- ============================================================
+-- INDEXES (using IF NOT EXISTS for safety)
+-- ============================================================
+CREATE INDEX IF NOT EXISTS idx_patients_email ON patients(email);
+CREATE INDEX IF NOT EXISTS idx_patients_user_profile ON patients(user_profile_id);
+CREATE INDEX IF NOT EXISTS idx_ivf_cycles_patient ON ivf_cycles(patient_id);
+CREATE INDEX IF NOT EXISTS idx_ivf_cycles_status ON ivf_cycles(status);
+CREATE INDEX IF NOT EXISTS idx_medications_patient ON medications(patient_id);
+CREATE INDEX IF NOT EXISTS idx_medication_adherence_patient ON medication_adherence(patient_id, adherence_date);
+CREATE INDEX IF NOT EXISTS idx_coordination_tasks_assigned_to ON coordination_tasks(assigned_to);
+CREATE INDEX IF NOT EXISTS idx_coordination_tasks_patient ON coordination_tasks(patient_id);
+CREATE INDEX IF NOT EXISTS idx_coordination_tasks_status ON coordination_tasks(status);
+CREATE INDEX IF NOT EXISTS idx_patient_complaints_patient ON patient_complaints(patient_id);
+CREATE INDEX IF NOT EXISTS idx_alerts_patient ON alerts(patient_id);
+CREATE INDEX IF NOT EXISTS idx_audit_log_user ON audit_log(user_id);
+CREATE INDEX IF NOT EXISTS idx_access_logs_user ON access_logs(user_id);
+CREATE INDEX IF NOT EXISTS idx_kyc_documents_patient ON kyc_documents(patient_id);
+CREATE INDEX IF NOT EXISTS idx_compliance_documents_patient ON compliance_documents(patient_id);
+CREATE INDEX IF NOT EXISTS idx_clinical_history_patient ON clinical_history(patient_id);
+CREATE INDEX IF NOT EXISTS idx_semen_analysis_patient ON semen_analysis(patient_id);
+CREATE INDEX IF NOT EXISTS idx_scan_records_patient ON scan_records(patient_id);
+CREATE INDEX IF NOT EXISTS idx_scan_records_cycle ON scan_records(cycle_id);
+CREATE INDEX IF NOT EXISTS idx_stimulation_daily_log_cycle ON stimulation_daily_log(cycle_id);
+CREATE INDEX IF NOT EXISTS idx_stimulation_daily_log_patient ON stimulation_daily_log(patient_id);
+CREATE INDEX IF NOT EXISTS idx_opu_records_cycle ON opu_records(cycle_id);
+CREATE INDEX IF NOT EXISTS idx_opu_records_patient ON opu_records(patient_id);
+CREATE INDEX IF NOT EXISTS idx_embryology_records_cycle ON embryology_records(cycle_id);
+CREATE INDEX IF NOT EXISTS idx_embryology_records_patient ON embryology_records(patient_id);
+CREATE INDEX IF NOT EXISTS idx_embryo_transfer_records_cycle ON embryo_transfer_records(cycle_id);
+CREATE INDEX IF NOT EXISTS idx_embryo_transfer_records_patient ON embryo_transfer_records(patient_id);
+CREATE INDEX IF NOT EXISTS idx_cycle_outcomes_cycle ON cycle_outcomes(cycle_id);
+CREATE INDEX IF NOT EXISTS idx_cycle_outcomes_patient ON cycle_outcomes(patient_id);
+CREATE INDEX IF NOT EXISTS idx_billing_records_patient ON billing_records(patient_id);
+CREATE INDEX IF NOT EXISTS idx_billing_records_cycle ON billing_records(cycle_id);
 
--- ============================================
--- RLS ENABLEMENT FOR NEW TABLES
--- ============================================
+-- ============================================================
+-- ENABLE ROW LEVEL SECURITY (RLS)
+-- ============================================================
+ALTER TABLE user_profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE patients ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ivf_cycles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE medications ENABLE ROW LEVEL SECURITY;
+ALTER TABLE medication_adherence ENABLE ROW LEVEL SECURITY;
+ALTER TABLE appointments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE medical_results ENABLE ROW LEVEL SECURITY;
+ALTER TABLE coordination_tasks ENABLE ROW LEVEL SECURITY;
+ALTER TABLE patient_complaints ENABLE ROW LEVEL SECURITY;
+ALTER TABLE alerts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE nartsr_records ENABLE ROW LEVEL SECURITY;
+ALTER TABLE kyc_documents ENABLE ROW LEVEL SECURITY;
+ALTER TABLE compliance_documents ENABLE ROW LEVEL SECURITY;
+ALTER TABLE counseling_sessions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ids_results ENABLE ROW LEVEL SECURITY;
 ALTER TABLE clinical_history ENABLE ROW LEVEL SECURITY;
 ALTER TABLE semen_analysis ENABLE ROW LEVEL SECURITY;
 ALTER TABLE scan_records ENABLE ROW LEVEL SECURITY;
@@ -662,105 +598,291 @@ ALTER TABLE embryo_transfer_records ENABLE ROW LEVEL SECURITY;
 ALTER TABLE cycle_outcomes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE billing_records ENABLE ROW LEVEL SECURITY;
 
--- ============================================
--- RLS POLICIES FOR NEW TABLES
--- ============================================
+-- ============================================================
+-- RLS POLICIES
+-- Note: DROP POLICY IF EXISTS + CREATE ensures idempotency
+-- ============================================================
 
--- clinical_history policies
+-- user_profiles: Everyone can view their own profile
+DROP POLICY IF EXISTS "Users can view own profile" ON user_profiles;
+CREATE POLICY "Users can view own profile" ON user_profiles
+  FOR SELECT USING (auth.uid() = auth_id);
+
+DROP POLICY IF EXISTS "Service role can manage all profiles" ON user_profiles;
+CREATE POLICY "Service role can manage all profiles" ON user_profiles
+  FOR ALL USING (true)
+  WITH CHECK (true);
+
+-- patients: own data + assigned doctor/nurse
+DROP POLICY IF EXISTS "Patients can view their own data" ON patients;
+CREATE POLICY "Patients can view their own data" ON patients
+  FOR SELECT USING (
+    user_profile_id = (SELECT id FROM user_profiles WHERE auth_id = auth.uid())
+  );
+
+DROP POLICY IF EXISTS "Doctors can view assigned patients" ON patients;
+CREATE POLICY "Doctors can view assigned patients" ON patients
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM doctor_patient_assignments
+      WHERE doctor_id = (SELECT id FROM user_profiles WHERE auth_id = auth.uid())
+        AND patient_id = patients.id
+    )
+  );
+
+DROP POLICY IF EXISTS "Nurses can view assigned patients" ON patients;
+CREATE POLICY "Nurses can view assigned patients" ON patients
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM nurse_patient_assignments
+      WHERE nurse_id = (SELECT id FROM user_profiles WHERE auth_id = auth.uid())
+        AND patient_id = patients.id
+    )
+  );
+
+DROP POLICY IF EXISTS "Doctors can update patients" ON patients;
+CREATE POLICY "Doctors can update patients" ON patients
+  FOR UPDATE USING (
+    EXISTS (
+      SELECT 1 FROM doctor_patient_assignments
+      WHERE doctor_id = (SELECT id FROM user_profiles WHERE auth_id = auth.uid())
+        AND patient_id = patients.id
+    )
+  );
+
+DROP POLICY IF EXISTS "Nurses can update patients" ON patients;
+CREATE POLICY "Nurses can update patients" ON patients
+  FOR UPDATE USING (
+    EXISTS (
+      SELECT 1 FROM nurse_patient_assignments
+      WHERE nurse_id = (SELECT id FROM user_profiles WHERE auth_id = auth.uid())
+        AND patient_id = patients.id
+    )
+  );
+
+-- coordination_tasks
+DROP POLICY IF EXISTS "Users can view assigned coordination tasks" ON coordination_tasks;
+CREATE POLICY "Users can view assigned coordination tasks" ON coordination_tasks
+  FOR SELECT USING (
+    assigned_to = (SELECT id FROM user_profiles WHERE auth_id = auth.uid()) OR
+    created_by = (SELECT id FROM user_profiles WHERE auth_id = auth.uid())
+  );
+
+DROP POLICY IF EXISTS "Doctors can manage coordination tasks" ON coordination_tasks;
+CREATE POLICY "Doctors can manage coordination tasks" ON coordination_tasks
+  FOR ALL USING (
+    created_by = (SELECT id FROM user_profiles WHERE auth_id = auth.uid())
+  );
+
+DROP POLICY IF EXISTS "Nurses can update coordination tasks" ON coordination_tasks;
+CREATE POLICY "Nurses can update coordination tasks" ON coordination_tasks
+  FOR UPDATE USING (
+    assigned_to = (SELECT id FROM user_profiles WHERE auth_id = auth.uid())
+  );
+
+-- kyc_documents
+DROP POLICY IF EXISTS "Nurses and doctors can view kyc" ON kyc_documents;
+CREATE POLICY "Nurses and doctors can view kyc" ON kyc_documents
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM nurse_patient_assignments
+      WHERE nurse_id = (SELECT id FROM user_profiles WHERE auth_id = auth.uid())
+        AND patient_id = kyc_documents.patient_id
+    ) OR
+    EXISTS (
+      SELECT 1 FROM doctor_patient_assignments
+      WHERE doctor_id = (SELECT id FROM user_profiles WHERE auth_id = auth.uid())
+        AND patient_id = kyc_documents.patient_id
+    )
+  );
+
+DROP POLICY IF EXISTS "Nurses can manage kyc documents" ON kyc_documents;
+CREATE POLICY "Nurses can manage kyc documents" ON kyc_documents
+  FOR ALL USING (
+    EXISTS (
+      SELECT 1 FROM nurse_patient_assignments
+      WHERE nurse_id = (SELECT id FROM user_profiles WHERE auth_id = auth.uid())
+        AND patient_id = kyc_documents.patient_id
+    )
+  );
+
+-- compliance_documents
+DROP POLICY IF EXISTS "Nurses and doctors can view compliance" ON compliance_documents;
+CREATE POLICY "Nurses and doctors can view compliance" ON compliance_documents
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM nurse_patient_assignments
+      WHERE nurse_id = (SELECT id FROM user_profiles WHERE auth_id = auth.uid())
+        AND patient_id = compliance_documents.patient_id
+    ) OR
+    EXISTS (
+      SELECT 1 FROM doctor_patient_assignments
+      WHERE doctor_id = (SELECT id FROM user_profiles WHERE auth_id = auth.uid())
+        AND patient_id = compliance_documents.patient_id
+    )
+  );
+
+DROP POLICY IF EXISTS "Nurses can manage compliance documents" ON compliance_documents;
+CREATE POLICY "Nurses can manage compliance documents" ON compliance_documents
+  FOR ALL USING (
+    EXISTS (
+      SELECT 1 FROM nurse_patient_assignments
+      WHERE nurse_id = (SELECT id FROM user_profiles WHERE auth_id = auth.uid())
+        AND patient_id = compliance_documents.patient_id
+    )
+  );
+
+-- clinical_history
+DROP POLICY IF EXISTS "Patients can view their own clinical_history" ON clinical_history;
 CREATE POLICY "Patients can view their own clinical_history" ON clinical_history
-  FOR SELECT USING (patient_id = (SELECT id FROM patients WHERE user_profile_id = auth.uid()));
+  FOR SELECT USING (
+    patient_id = (SELECT id FROM patients WHERE user_profile_id = (SELECT id FROM user_profiles WHERE auth_id = auth.uid()))
+  );
 
+DROP POLICY IF EXISTS "Doctors can manage clinical_history" ON clinical_history;
 CREATE POLICY "Doctors can manage clinical_history" ON clinical_history
-  FOR ALL USING (EXISTS (SELECT 1 FROM doctor_patient_assignments WHERE doctor_id = auth.uid() AND patient_id = clinical_history.patient_id));
+  FOR ALL USING (
+    EXISTS (SELECT 1 FROM doctor_patient_assignments WHERE doctor_id = (SELECT id FROM user_profiles WHERE auth_id = auth.uid()) AND patient_id = clinical_history.patient_id)
+  );
 
+DROP POLICY IF EXISTS "Nurses can manage clinical_history" ON clinical_history;
 CREATE POLICY "Nurses can manage clinical_history" ON clinical_history
-  FOR ALL USING (EXISTS (SELECT 1 FROM nurse_patient_assignments WHERE nurse_id = auth.uid() AND patient_id = clinical_history.patient_id));
+  FOR ALL USING (
+    EXISTS (SELECT 1 FROM nurse_patient_assignments WHERE nurse_id = (SELECT id FROM user_profiles WHERE auth_id = auth.uid()) AND patient_id = clinical_history.patient_id)
+  );
 
--- semen_analysis policies
+-- semen_analysis
+DROP POLICY IF EXISTS "Patients can view their own semen_analysis" ON semen_analysis;
 CREATE POLICY "Patients can view their own semen_analysis" ON semen_analysis
-  FOR SELECT USING (patient_id = (SELECT id FROM patients WHERE user_profile_id = auth.uid()));
+  FOR SELECT USING (
+    patient_id = (SELECT id FROM patients WHERE user_profile_id = (SELECT id FROM user_profiles WHERE auth_id = auth.uid()))
+  );
 
+DROP POLICY IF EXISTS "Doctors can manage semen_analysis" ON semen_analysis;
 CREATE POLICY "Doctors can manage semen_analysis" ON semen_analysis
-  FOR ALL USING (EXISTS (SELECT 1 FROM doctor_patient_assignments WHERE doctor_id = auth.uid() AND patient_id = semen_analysis.patient_id));
+  FOR ALL USING (
+    EXISTS (SELECT 1 FROM doctor_patient_assignments WHERE doctor_id = (SELECT id FROM user_profiles WHERE auth_id = auth.uid()) AND patient_id = semen_analysis.patient_id)
+  );
 
+DROP POLICY IF EXISTS "Nurses can manage semen_analysis" ON semen_analysis;
 CREATE POLICY "Nurses can manage semen_analysis" ON semen_analysis
-  FOR ALL USING (EXISTS (SELECT 1 FROM nurse_patient_assignments WHERE nurse_id = auth.uid() AND patient_id = semen_analysis.patient_id));
+  FOR ALL USING (
+    EXISTS (SELECT 1 FROM nurse_patient_assignments WHERE nurse_id = (SELECT id FROM user_profiles WHERE auth_id = auth.uid()) AND patient_id = semen_analysis.patient_id)
+  );
 
--- scan_records policies
+-- scan_records
+DROP POLICY IF EXISTS "Patients can view their own scan_records" ON scan_records;
 CREATE POLICY "Patients can view their own scan_records" ON scan_records
-  FOR SELECT USING (patient_id = (SELECT id FROM patients WHERE user_profile_id = auth.uid()));
+  FOR SELECT USING (
+    patient_id = (SELECT id FROM patients WHERE user_profile_id = (SELECT id FROM user_profiles WHERE auth_id = auth.uid()))
+  );
 
+DROP POLICY IF EXISTS "Doctors can manage scan_records" ON scan_records;
 CREATE POLICY "Doctors can manage scan_records" ON scan_records
-  FOR ALL USING (EXISTS (SELECT 1 FROM doctor_patient_assignments WHERE doctor_id = auth.uid() AND patient_id = scan_records.patient_id));
+  FOR ALL USING (
+    EXISTS (SELECT 1 FROM doctor_patient_assignments WHERE doctor_id = (SELECT id FROM user_profiles WHERE auth_id = auth.uid()) AND patient_id = scan_records.patient_id)
+  );
 
+DROP POLICY IF EXISTS "Nurses can manage scan_records" ON scan_records;
 CREATE POLICY "Nurses can manage scan_records" ON scan_records
-  FOR ALL USING (EXISTS (SELECT 1 FROM nurse_patient_assignments WHERE nurse_id = auth.uid() AND patient_id = scan_records.patient_id));
+  FOR ALL USING (
+    EXISTS (SELECT 1 FROM nurse_patient_assignments WHERE nurse_id = (SELECT id FROM user_profiles WHERE auth_id = auth.uid()) AND patient_id = scan_records.patient_id)
+  );
 
--- stimulation_daily_log policies
-CREATE POLICY "Patients can view their own stimulation_daily_log" ON stimulation_daily_log
-  FOR SELECT USING (patient_id = (SELECT id FROM patients WHERE user_profile_id = auth.uid()));
+-- medications: patients can view their own
+DROP POLICY IF EXISTS "Patients can view their own medications" ON medications;
+CREATE POLICY "Patients can view their own medications" ON medications
+  FOR SELECT USING (
+    patient_id = (SELECT id FROM patients WHERE user_profile_id = (SELECT id FROM user_profiles WHERE auth_id = auth.uid()))
+  );
 
-CREATE POLICY "Doctors can manage stimulation_daily_log" ON stimulation_daily_log
-  FOR ALL USING (EXISTS (SELECT 1 FROM doctor_patient_assignments WHERE doctor_id = auth.uid() AND patient_id = stimulation_daily_log.patient_id));
+DROP POLICY IF EXISTS "Doctors can manage medications" ON medications;
+CREATE POLICY "Doctors can manage medications" ON medications
+  FOR ALL USING (
+    EXISTS (SELECT 1 FROM doctor_patient_assignments WHERE doctor_id = (SELECT id FROM user_profiles WHERE auth_id = auth.uid()) AND patient_id = medications.patient_id)
+  );
 
-CREATE POLICY "Nurses can manage stimulation_daily_log" ON stimulation_daily_log
-  FOR ALL USING (EXISTS (SELECT 1 FROM nurse_patient_assignments WHERE nurse_id = auth.uid() AND patient_id = stimulation_daily_log.patient_id));
+DROP POLICY IF EXISTS "Nurses can manage medications" ON medications;
+CREATE POLICY "Nurses can manage medications" ON medications
+  FOR ALL USING (
+    EXISTS (SELECT 1 FROM nurse_patient_assignments WHERE nurse_id = (SELECT id FROM user_profiles WHERE auth_id = auth.uid()) AND patient_id = medications.patient_id)
+  );
 
--- opu_records policies
-CREATE POLICY "Patients can view their own opu_records" ON opu_records
-  FOR SELECT USING (patient_id = (SELECT id FROM patients WHERE user_profile_id = auth.uid()));
+-- medication_adherence
+DROP POLICY IF EXISTS "Patients can view their own adherence" ON medication_adherence;
+CREATE POLICY "Patients can view their own adherence" ON medication_adherence
+  FOR SELECT USING (
+    patient_id = (SELECT id FROM patients WHERE user_profile_id = (SELECT id FROM user_profiles WHERE auth_id = auth.uid()))
+  );
 
+DROP POLICY IF EXISTS "Nurses can manage adherence" ON medication_adherence;
+CREATE POLICY "Nurses can manage adherence" ON medication_adherence
+  FOR ALL USING (
+    EXISTS (SELECT 1 FROM nurse_patient_assignments WHERE nurse_id = (SELECT id FROM user_profiles WHERE auth_id = auth.uid()) AND patient_id = medication_adherence.patient_id)
+  );
+
+-- opu_records, embryology_records, embryo_transfer_records, cycle_outcomes, billing_records
+DROP POLICY IF EXISTS "Doctors can manage opu_records" ON opu_records;
 CREATE POLICY "Doctors can manage opu_records" ON opu_records
-  FOR ALL USING (EXISTS (SELECT 1 FROM doctor_patient_assignments WHERE doctor_id = auth.uid() AND patient_id = opu_records.patient_id));
+  FOR ALL USING (EXISTS (SELECT 1 FROM doctor_patient_assignments WHERE doctor_id = (SELECT id FROM user_profiles WHERE auth_id = auth.uid()) AND patient_id = opu_records.patient_id));
 
+DROP POLICY IF EXISTS "Nurses can manage opu_records" ON opu_records;
 CREATE POLICY "Nurses can manage opu_records" ON opu_records
-  FOR ALL USING (EXISTS (SELECT 1 FROM nurse_patient_assignments WHERE nurse_id = auth.uid() AND patient_id = opu_records.patient_id));
+  FOR ALL USING (EXISTS (SELECT 1 FROM nurse_patient_assignments WHERE nurse_id = (SELECT id FROM user_profiles WHERE auth_id = auth.uid()) AND patient_id = opu_records.patient_id));
 
--- embryology_records policies
-CREATE POLICY "Patients can view their own embryology_records" ON embryology_records
-  FOR SELECT USING (patient_id = (SELECT id FROM patients WHERE user_profile_id = auth.uid()));
-
+DROP POLICY IF EXISTS "Doctors can manage embryology_records" ON embryology_records;
 CREATE POLICY "Doctors can manage embryology_records" ON embryology_records
-  FOR ALL USING (EXISTS (SELECT 1 FROM doctor_patient_assignments WHERE doctor_id = auth.uid() AND patient_id = embryology_records.patient_id));
+  FOR ALL USING (EXISTS (SELECT 1 FROM doctor_patient_assignments WHERE doctor_id = (SELECT id FROM user_profiles WHERE auth_id = auth.uid()) AND patient_id = embryology_records.patient_id));
 
-CREATE POLICY "Nurses can manage embryology_records" ON embryology_records
-  FOR ALL USING (EXISTS (SELECT 1 FROM nurse_patient_assignments WHERE nurse_id = auth.uid() AND patient_id = embryology_records.patient_id));
-
--- embryo_transfer_records policies
-CREATE POLICY "Patients can view their own embryo_transfer_records" ON embryo_transfer_records
-  FOR SELECT USING (patient_id = (SELECT id FROM patients WHERE user_profile_id = auth.uid()));
-
+DROP POLICY IF EXISTS "Doctors can manage embryo_transfer_records" ON embryo_transfer_records;
 CREATE POLICY "Doctors can manage embryo_transfer_records" ON embryo_transfer_records
-  FOR ALL USING (EXISTS (SELECT 1 FROM doctor_patient_assignments WHERE doctor_id = auth.uid() AND patient_id = embryo_transfer_records.patient_id));
+  FOR ALL USING (EXISTS (SELECT 1 FROM doctor_patient_assignments WHERE doctor_id = (SELECT id FROM user_profiles WHERE auth_id = auth.uid()) AND patient_id = embryo_transfer_records.patient_id));
 
-CREATE POLICY "Nurses can manage embryo_transfer_records" ON embryo_transfer_records
-  FOR ALL USING (EXISTS (SELECT 1 FROM nurse_patient_assignments WHERE nurse_id = auth.uid() AND patient_id = embryo_transfer_records.patient_id));
-
--- cycle_outcomes policies
-CREATE POLICY "Patients can view their own cycle_outcomes" ON cycle_outcomes
-  FOR SELECT USING (patient_id = (SELECT id FROM patients WHERE user_profile_id = auth.uid()));
-
+DROP POLICY IF EXISTS "Doctors can manage cycle_outcomes" ON cycle_outcomes;
 CREATE POLICY "Doctors can manage cycle_outcomes" ON cycle_outcomes
-  FOR ALL USING (EXISTS (SELECT 1 FROM doctor_patient_assignments WHERE doctor_id = auth.uid() AND patient_id = cycle_outcomes.patient_id));
+  FOR ALL USING (EXISTS (SELECT 1 FROM doctor_patient_assignments WHERE doctor_id = (SELECT id FROM user_profiles WHERE auth_id = auth.uid()) AND patient_id = cycle_outcomes.patient_id));
 
-CREATE POLICY "Nurses can manage cycle_outcomes" ON cycle_outcomes
-  FOR ALL USING (EXISTS (SELECT 1 FROM nurse_patient_assignments WHERE nurse_id = auth.uid() AND patient_id = cycle_outcomes.patient_id));
+DROP POLICY IF EXISTS "Patients can view their own cycle_outcomes" ON cycle_outcomes;
+CREATE POLICY "Patients can view their own cycle_outcomes" ON cycle_outcomes
+  FOR SELECT USING (
+    patient_id = (SELECT id FROM patients WHERE user_profile_id = (SELECT id FROM user_profiles WHERE auth_id = auth.uid()))
+  );
 
--- billing_records policies
-CREATE POLICY "Patients can view their own billing_records" ON billing_records
-  FOR SELECT USING (patient_id = (SELECT id FROM patients WHERE user_profile_id = auth.uid()));
-
+DROP POLICY IF EXISTS "Doctors can manage billing_records" ON billing_records;
 CREATE POLICY "Doctors can manage billing_records" ON billing_records
-  FOR ALL USING (EXISTS (SELECT 1 FROM doctor_patient_assignments WHERE doctor_id = auth.uid() AND patient_id = billing_records.patient_id));
+  FOR ALL USING (EXISTS (SELECT 1 FROM doctor_patient_assignments WHERE doctor_id = (SELECT id FROM user_profiles WHERE auth_id = auth.uid()) AND patient_id = billing_records.patient_id));
 
-CREATE POLICY "Nurses can manage billing_records" ON billing_records
-  FOR ALL USING (EXISTS (SELECT 1 FROM nurse_patient_assignments WHERE nurse_id = auth.uid() AND patient_id = billing_records.patient_id));
+DROP POLICY IF EXISTS "Patients can view their own billing_records" ON billing_records;
+CREATE POLICY "Patients can view their own billing_records" ON billing_records
+  FOR SELECT USING (
+    patient_id = (SELECT id FROM patients WHERE user_profile_id = (SELECT id FROM user_profiles WHERE auth_id = auth.uid()))
+  );
 
--- ============================================
--- DONE
--- ============================================
--- Schema creation complete!
--- All 26 tables created with indexes, RLS policies, and views
--- Ready for API implementation
--- Fixed: Removed non-immutable age generated column
+-- audit_log: allow insert from all (server uses service role so this is covered)
+DROP POLICY IF EXISTS "Allow service role to manage audit_log" ON audit_log;
+CREATE POLICY "Allow service role to manage audit_log" ON audit_log
+  FOR ALL USING (true)
+  WITH CHECK (true);
 
+-- ============================================================
+-- DASHBOARD VIEW
+-- ============================================================
+CREATE OR REPLACE VIEW patient_dashboard_summary AS
+SELECT
+  p.id,
+  p.first_name,
+  p.last_name,
+  p.email,
+  COUNT(DISTINCT ic.id) as total_cycles,
+  COUNT(DISTINCT CASE WHEN ic.status != 'COMPLETED' THEN ic.id END) as active_cycles,
+  COUNT(DISTINCT m.id) as total_medications,
+  COUNT(DISTINCT ct.id) as pending_tasks
+FROM patients p
+LEFT JOIN ivf_cycles ic ON p.id = ic.patient_id
+LEFT JOIN medications m ON p.id = m.patient_id
+LEFT JOIN coordination_tasks ct ON p.id = ct.patient_id AND ct.status = 'PENDING'
+GROUP BY p.id, p.first_name, p.last_name, p.email;
+
+-- ============================================================
+-- DONE — All 26 tables created/verified with indexes and RLS
+-- ============================================================

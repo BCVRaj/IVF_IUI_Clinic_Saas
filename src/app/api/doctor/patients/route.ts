@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
       }
       const { data, error } = await supabaseServer
         .from("patients")
-        .select("id, first_name, last_name, email, phone, date_of_birth, gender, blood_type")
+        .select("id, first_name, last_name, email, phone, date_of_birth, gender, blood_type, onboarding_status")
         .order("created_at", { ascending: false })
         .limit(50);
       if (error) {
@@ -95,7 +95,8 @@ export async function GET(request: NextRequest) {
             phone,
             date_of_birth,
             gender,
-            blood_type
+            blood_type,
+            onboarding_status
           )
         `)
         .eq("doctor_id", profile.id)
@@ -112,7 +113,7 @@ export async function GET(request: NextRequest) {
       if (isDevMode && formattedPatients.length === 0) {
         const { data: allPatients } = await supabaseServer
           .from("patients")
-          .select("id, first_name, last_name, email, phone, date_of_birth, gender, blood_type")
+          .select("id, first_name, last_name, email, phone, date_of_birth, gender, blood_type, onboarding_status")
           .order("created_at", { ascending: false })
           .limit(50);
         return NextResponse.json({
@@ -132,7 +133,7 @@ export async function GET(request: NextRequest) {
     // Dev mode fallback: no doctor profile for this token — return all patients
     const { data: allPatients, error: allError } = await supabaseServer
       .from("patients")
-      .select("id, first_name, last_name, email, phone, date_of_birth, gender, blood_type")
+      .select("id, first_name, last_name, email, phone, date_of_birth, gender, blood_type, onboarding_status")
       .order("created_at", { ascending: false })
       .limit(50);
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CalendarDays, MessageSquareText, Upload } from "lucide-react";
+import { CalendarDays, MessageSquareText, Upload, AlertTriangle } from "lucide-react";
 
 import { CycleStepper } from "@/components/patient/cycle-stepper";
 import { MedicationCard } from "@/components/patient/medication-card";
@@ -16,13 +16,15 @@ import {
 export default function PatientDashboardPage() {
   const [patient, setPatient] = useState<any>(null);
   const [medications, setMedications] = useState<any[]>([]);
+  const [alerts, setAlerts] = useState<any[]>([]);
 
   useEffect(() => {
     const load = async () => {
       try {
-        const [profileRes, medsRes] = await Promise.all([
+        const [profileRes, medsRes, alertsRes] = await Promise.all([
           fetch("/api/patient/profile"),
           fetch("/api/patient/medications"),
+          fetch("/api/patient/alerts"),
         ]);
         if (profileRes.ok) {
           const json = await profileRes.json();
@@ -31,6 +33,10 @@ export default function PatientDashboardPage() {
         if (medsRes.ok) {
           const json = await medsRes.json();
           setMedications(json.data || []);
+        }
+        if (alertsRes.ok) {
+          const json = await alertsRes.json();
+          setAlerts(json.data || []);
         }
       } catch (_) {}
     };
@@ -45,12 +51,30 @@ export default function PatientDashboardPage() {
     id: m.id,
     name: m.medication_name,
     dose: m.dose,
+    route: m.route || "Oral",
     time: m.frequency || "Daily",
-    status: m.medication_adherence?.[0]?.status === "TAKEN" ? "Taken" : "Pending",
+    status: (m.medication_adherence?.[0]?.status === "TAKEN" ? "taken" : "upcoming") as "taken" | "upcoming",
   }));
 
   return (
     <div className="space-y-8">
+      {alerts.length > 0 && (
+        <div className="space-y-3">
+          {alerts.map((alert) => (
+            <div key={alert.id} className="rounded-xl border border-rose-200 bg-rose-50 p-4 shadow-sm flex items-start gap-3">
+              <AlertTriangle className="size-5 text-rose-600 mt-0.5 shrink-0" />
+              <div className="flex-1">
+                <h3 className="text-sm font-bold text-rose-900">{alert.alert_type.replace(/_/g, " ")}</h3>
+                <p className="mt-1 text-sm text-rose-700">{alert.message}</p>
+              </div>
+              <Button size="sm" className="bg-rose-600 hover:bg-rose-700 text-white shrink-0" onClick={() => window.alert("Simulating file upload...")}>
+                <Upload className="mr-2 size-4" /> Upload Document
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
+
       <section className="rounded-2xl bg-white p-8 shadow-sm">
         <p className="mb-2 text-xs font-bold uppercase tracking-[0.2em] text-emerald-700">
           Current Status
