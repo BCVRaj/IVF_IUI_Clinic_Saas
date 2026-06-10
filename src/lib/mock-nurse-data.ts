@@ -8,14 +8,14 @@ export const nurseStats = [
   },
   {
     id: "s2",
-    label: "Pending check-ins",
+    label: "Pending Patients KYC",
     value: "08",
     detail: "3 urgent",
     tone: "secondary",
   },
   {
     id: "s3",
-    label: "Meds due",
+    label: "Pending Assigned Tasks",
     value: "15",
     detail: "within 60m",
     tone: "accent",

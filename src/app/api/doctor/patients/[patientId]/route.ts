@@ -104,7 +104,7 @@ export async function GET(
       );
     }
 
-    let kyc_documents = [];
+    let kyc_documents: Record<string, unknown>[] = [];
     try {
       const { data: docs } = await supabaseServer
         .from("kyc_documents")
@@ -119,7 +119,7 @@ export async function GET(
       // Ignore error if table doesn't exist
     }
 
-    let clinical_history = [];
+    let clinical_history: Record<string, unknown>[] = [];
     try {
       const { data: hist } = await supabaseServer
         .from("clinical_history")
@@ -128,7 +128,7 @@ export async function GET(
       if (hist) clinical_history = hist;
     } catch (e) {}
 
-    let semen_analysis = [];
+    let semen_analysis: Record<string, unknown>[] = [];
     try {
       const { data: sem } = await supabaseServer
         .from("semen_analysis")
@@ -138,7 +138,7 @@ export async function GET(
       if (sem) semen_analysis = sem;
     } catch (e) {}
 
-    let scan_records = [];
+    let scan_records: Record<string, unknown>[] = [];
     try {
       const { data: scans } = await supabaseServer
         .from("scan_records")
@@ -148,7 +148,7 @@ export async function GET(
       if (scans) scan_records = scans;
     } catch (e) {}
 
-    let stimulation_daily_log = [];
+    let stimulation_daily_log: Record<string, unknown>[] = [];
     try {
       const { data: stim } = await supabaseServer
         .from("stimulation_daily_log")
@@ -158,7 +158,7 @@ export async function GET(
       if (stim) stimulation_daily_log = stim;
     } catch (e) {}
 
-    let opu_records = [];
+    let opu_records: Record<string, unknown>[] = [];
     try {
       const { data: opu } = await supabaseServer
         .from("opu_records")
@@ -168,7 +168,7 @@ export async function GET(
       if (opu) opu_records = opu;
     } catch (e) {}
 
-    let embryology_records = [];
+    let embryology_records: Record<string, unknown>[] = [];
     try {
       const { data: emb } = await supabaseServer
         .from("embryology_records")
@@ -178,7 +178,7 @@ export async function GET(
       if (emb) embryology_records = emb;
     } catch (e) {}
 
-    let embryo_transfer_records = [];
+    let embryo_transfer_records: Record<string, unknown>[] = [];
     try {
       const { data: trans } = await supabaseServer
         .from("embryo_transfer_records")
@@ -188,7 +188,7 @@ export async function GET(
       if (trans) embryo_transfer_records = trans;
     } catch (e) {}
 
-    let cycle_outcomes = [];
+    let cycle_outcomes: Record<string, unknown>[] = [];
     try {
       const { data: outcomes } = await supabaseServer
         .from("cycle_outcomes")
@@ -198,7 +198,7 @@ export async function GET(
       if (outcomes) cycle_outcomes = outcomes;
     } catch (e) {}
 
-    let billing_records = [];
+    let billing_records: Record<string, unknown>[] = [];
     try {
       const { data: bill } = await supabaseServer
         .from("billing_records")

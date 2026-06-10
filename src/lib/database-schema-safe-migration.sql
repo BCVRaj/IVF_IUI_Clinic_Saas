@@ -45,6 +45,7 @@ CREATE TABLE IF NOT EXISTS patients (
   medical_visa_status TEXT,
   marriage_cert_verified BOOLEAN DEFAULT FALSE,
   onboarding_status TEXT DEFAULT 'INCOMPLETE' CHECK (onboarding_status IN ('INCOMPLETE', 'PENDING_VERIFICATION', 'CLEARED')),
+  address TEXT,
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
 );
@@ -540,6 +541,9 @@ CREATE TABLE IF NOT EXISTS billing_records (
 -- ============================================================
 CREATE INDEX IF NOT EXISTS idx_patients_email ON patients(email);
 CREATE INDEX IF NOT EXISTS idx_patients_user_profile ON patients(user_profile_id);
+
+-- Safe column addition for existing databases (idempotent)
+ALTER TABLE patients ADD COLUMN IF NOT EXISTS address TEXT;
 CREATE INDEX IF NOT EXISTS idx_ivf_cycles_patient ON ivf_cycles(patient_id);
 CREATE INDEX IF NOT EXISTS idx_ivf_cycles_status ON ivf_cycles(status);
 CREATE INDEX IF NOT EXISTS idx_medications_patient ON medications(patient_id);

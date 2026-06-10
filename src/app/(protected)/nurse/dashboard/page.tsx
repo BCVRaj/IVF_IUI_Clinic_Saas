@@ -1,38 +1,108 @@
 "use client";
+
 import { useEffect, useState, useCallback } from "react";
-import { AlertTriangle, CheckCircle2, Clock } from "lucide-react";
-import Link from 'next/link';
+import { CheckCircle2 } from "lucide-react";
+import Link from "next/link";
 
 import { StatusBadge } from "@/components/patient/status-badge";
 import { Button } from "@/components/ui/button";
-import {
-  nurseAlerts,
-  nurseStats,
-  nurseTimeline,
-} from "@/lib/mock-nurse-data";
+import { nurseStats } from "@/lib/mock-nurse-data";
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+type Patient = {
+  id: string;
+  first_name: string;
+  last_name: string;
+  email?: string;
+  date_of_birth?: string;
+  gender?: string;
+  onboarding_status?: string;
+};
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function computeAge(dob?: string): string {
+  if (!dob) return "—";
+  const d = new Date(dob);
+  const today = new Date();
+  const age =
+    today.getFullYear() -
+    d.getFullYear() -
+    (today < new Date(today.getFullYear(), d.getMonth(), d.getDate()) ? 1 : 0);
+  return isNaN(age) ? "—" : String(age);
+}
+
+function OnboardingBadge({ status }: { status?: string }) {
+  if (status === "CLEARED") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-green-700">
+        <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
+        Cleared
+      </span>
+    );
+  }
+  if (status === "PENDING_VERIFICATION") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-700">
+        <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+        Pending
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-red-700">
+      <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
+      Incomplete
+    </span>
+  );
+}
+
+// ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function NurseDashboardPage() {
+  // ── Patient list state ──
+  const [patients, setPatients] = useState<Patient[]>([]);
+  const [patientsLoading, setPatientsLoading] = useState(true);
+
+  // ── Assigned tasks state ──
   const [assignedTasks, setAssignedTasks] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [tasksLoading, setTasksLoading] = useState(true);
+  const [tasksError, setTasksError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
+  // ── Fetch patients ──
+  useEffect(() => {
+    const fetchPatients = async () => {
+      try {
+        const res = await fetch("/api/nurse/patients");
+        if (!res.ok) return;
+        const json = await res.json();
+        setPatients(json.data || []);
+      } catch (err) {
+        console.error("Failed to load patients:", err);
+      } finally {
+        setPatientsLoading(false);
+      }
+    };
+    fetchPatients();
+  }, []);
+
+  // ── Fetch tasks (auto-refresh every 10 s) ──
   const fetchTasks = useCallback(async () => {
     try {
-      setLoading(true);
+      setTasksLoading(true);
       const response = await fetch("/api/nurse/tasks");
-      if (!response.ok) {
-        throw new Error("Failed to fetch nurse tasks");
-      }
+      if (!response.ok) throw new Error("Failed to fetch nurse tasks");
       const data = await response.json();
       setAssignedTasks(data.data || []);
-      setError(null);
+      setTasksError(null);
     } catch (err: any) {
       console.error("Error fetching nurse tasks:", err);
-      setError(err.message || "Error loading tasks");
+      setTasksError(err.message || "Error loading tasks");
       setAssignedTasks([]);
     } finally {
-      setLoading(false);
+      setTasksLoading(false);
     }
   }, []);
 
@@ -42,6 +112,7 @@ export default function NurseDashboardPage() {
     return () => clearInterval(interval);
   }, [fetchTasks]);
 
+  // ── Task actions ──
   const acknowledgeTask = async (taskId: string) => {
     try {
       setActionLoading(taskId + "-ack");
@@ -68,7 +139,7 @@ export default function NurseDashboardPage() {
     }
   };
 
-  // Format task data from API response — Supabase returns joined rows as objects, not arrays
+  // ── Task formatting (identical to previous dashboard) ──
   const formatTask = (task: any) => ({
     ...task,
     patientName: task.patients
@@ -83,6 +154,7 @@ export default function NurseDashboardPage() {
 
   return (
     <div className="space-y-8 bg-background text-on-surface">
+      {/* ── Page Header ── */}
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-4xl font-extrabold tracking-tight text-primary">
@@ -96,17 +168,19 @@ export default function NurseDashboardPage() {
           <Button asChild variant="secondary" className="rounded-md border border-outline-variant/15 bg-surface-lowest text-[11px] uppercase tracking-wider text-on-surface hover:bg-surface-low shadow-none">
             <Link href="/nurse/verification">Verification Queue</Link>
           </Button>
-          <Button variant="secondary" className="rounded-md border border-outline-variant/15 bg-surface-lowest text-[11px] uppercase tracking-wider text-on-surface hover:bg-surface-low shadow-none">
-            Export Log
-          </Button>
           <Button asChild className="rounded-md bg-gradient-to-r from-primary to-primary-container text-[11px] uppercase tracking-wider text-primary-foreground hover:opacity-90 shadow-none">
-            <Link href="/nurse/check-in">New Check-in</Link>
+            <Link href="/nurse/onboarding">New Patient</Link>
           </Button>
         </div>
       </header>
 
+      {/* ── Stats Row ── */}
       <section className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        {nurseStats.map((stat) => (
+        {[
+          { id: "s1", label: "Total patients today", value: patients.length.toString(), detail: "Currently active", tone: "primary" },
+          { id: "s2", label: "Pending Patients KYC", value: patients.filter(p => p.onboarding_status !== "CLEARED").length.toString().padStart(2, '0'), detail: "Awaiting verification", tone: "secondary" },
+          { id: "s3", label: "Pending Assigned Tasks", value: assignedTasks.filter(t => t.status !== "COMPLETED").length.toString().padStart(2, '0'), detail: "Needs attention", tone: "accent" },
+        ].map((stat) => (
           <article key={stat.id} className="rounded-xl border-l-[3px] border-secondary bg-surface-lowest p-5 relative overflow-hidden backdrop-blur-md shadow-[0_8px_32px_rgba(25,28,30,0.04)]">
             <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
               {stat.label}
@@ -119,53 +193,145 @@ export default function NurseDashboardPage() {
         ))}
       </section>
 
-      {/* Physician-Assigned Tasks - REAL DATA FROM API */}
-      {!loading && assignedTasks.length > 0 && (
-        <section className="rounded-xl bg-surface-lowest shadow-[0_8px_32px_rgba(25,28,30,0.04)] backdrop-blur-md overflow-hidden">
-          <div className="flex items-center justify-between bg-surface px-6 py-4 border-b border-surface-dim/30">
-            <h2 className="text-lg font-bold text-primary">Assigned Tasks</h2>
-            <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-primary/10 text-primary">
-              {assignedTasks.length} task{assignedTasks.length !== 1 ? 's' : ''}
-            </span>
+      {/* ── 70 / 30 Split ── */}
+      <section className="grid grid-cols-1 gap-8 lg:grid-cols-12">
+
+        {/* ── LEFT 70% — Patient List ── */}
+        <div className="space-y-4 lg:col-span-8">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-bold">Patient List</h2>
           </div>
-          <div className="divide-y divide-surface-low">
-            {assignedTasks.map((task: any) => {
-              const formatted = formatTask(task);
-              return (
-                <div key={task.id} className="p-6 hover:bg-surface transition-colors duration-200">
-                  <div className="flex items-start justify-between gap-4 mb-3">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
-                        <h3 className="text-base font-bold text-primary">{formatted.patientName}</h3>
-                        {task.acknowledged && (
-                          <CheckCircle2 className="size-4 text-green-600 flex-shrink-0" />
-                        )}
+
+          <div className="overflow-hidden bg-surface-lowest rounded-xl shadow-[0_8px_32px_rgba(25,28,30,0.04)]">
+            <table className="w-full text-left">
+              <thead>
+                <tr className="bg-surface-low text-[10px] uppercase tracking-widest text-on-surface-variant">
+                  <th className="px-6 py-4">Patient Name</th>
+                  <th className="px-6 py-4">Patient ID</th>
+                  <th className="px-6 py-4">Gender</th>
+                  <th className="px-6 py-4">Age</th>
+                  <th className="px-6 py-4">Onboarding</th>
+                  <th className="px-6 py-4 text-right" />
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-surface-low overflow-hidden">
+                {patientsLoading ? (
+                  <tr>
+                    <td colSpan={6} className="px-6 py-8 text-sm text-on-surface-variant text-center">
+                      Loading patients…
+                    </td>
+                  </tr>
+                ) : patients.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="px-6 py-8 text-sm text-on-surface-variant text-center">
+                      No patients assigned yet.
+                    </td>
+                  </tr>
+                ) : (
+                  patients.map((patient) => (
+                    <tr key={patient.id} className="hover:bg-surface transition-colors duration-200">
+                      <td className="px-6 py-5">
+                        <p className="font-bold">{patient.first_name} {patient.last_name}</p>
+                        <p className="text-xs text-on-surface-variant">{patient.email}</p>
+                      </td>
+                      <td className="px-6 py-5 text-sm font-bold text-on-surface">{patient.id}</td>
+                      <td className="px-6 py-5 text-sm text-on-surface-variant">{patient.gender ?? "—"}</td>
+                      <td className="px-6 py-5 text-sm text-on-surface-variant">{computeAge(patient.date_of_birth)}</td>
+                      <td className="px-6 py-5">
+                        <OnboardingBadge status={patient.onboarding_status} />
+                      </td>
+                      <td className="px-6 py-5 text-right">
+                        <Link
+                          href={`/nurse/ehr/${patient.id}`}
+                          className="inline-block border border-outline-variant/15 px-3 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-wider text-on-surface hover:bg-surface hover:text-primary transition-colors duration-200"
+                        >
+                          Open EHR
+                        </Link>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* ── RIGHT 30% — Assigned Tasks ── */}
+        <aside className="lg:col-span-4">
+          <div className="rounded-xl bg-surface-lowest shadow-[0_8px_32px_rgba(25,28,30,0.04)] backdrop-blur-md overflow-hidden">
+            <div className="flex items-center justify-between bg-surface px-5 py-4 border-b border-surface-dim/30">
+              <h2 className="text-base font-bold text-primary">Assigned Tasks</h2>
+              {assignedTasks.length > 0 && (
+                <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-primary/10 text-primary">
+                  {assignedTasks.length} task{assignedTasks.length !== 1 ? "s" : ""}
+                </span>
+              )}
+            </div>
+
+            {/* Loading */}
+            {tasksLoading && (
+              <div className="p-5">
+                <p className="text-sm text-on-surface-variant">Loading tasks…</p>
+              </div>
+            )}
+
+            {/* Error */}
+            {tasksError && !tasksLoading && (
+              <div className="p-5">
+                <p className="text-sm text-red-500">Error: {tasksError}</p>
+              </div>
+            )}
+
+            {/* Empty */}
+            {!tasksLoading && !tasksError && assignedTasks.length === 0 && (
+              <div className="p-5">
+                <p className="text-sm text-on-surface-variant">No tasks assigned at this time.</p>
+              </div>
+            )}
+
+            {/* Task cards */}
+            {!tasksLoading && assignedTasks.length > 0 && (
+              <div className="divide-y divide-surface-low max-h-[70vh] overflow-y-auto">
+                {assignedTasks.map((task: any) => {
+                  const formatted = formatTask(task);
+                  return (
+                    <div key={task.id} className="p-5 hover:bg-surface transition-colors duration-200">
+                      <div className="flex items-start justify-between gap-2 mb-2">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <h3 className="text-sm font-bold text-primary truncate">{formatted.patientName}</h3>
+                            {task.acknowledged && (
+                              <CheckCircle2 className="size-3.5 text-green-600 flex-shrink-0" />
+                            )}
+                          </div>
+                          <p className="text-xs text-on-surface-variant">
+                            <span className="font-semibold">{task.title}</span>
+                          </p>
+                          <p className="text-[10px] text-on-surface-variant mt-0.5">
+                            By: {formatted.createdBy}
+                          </p>
+                        </div>
+                        <div className="flex flex-col items-end gap-1 shrink-0">
+                          <StatusBadge
+                            label={formatted.priority}
+                            tone={formatted.priority === "Critical" ? "danger" : "warning"}
+                          />
+                          <span className="text-[10px] font-semibold text-on-surface-variant">
+                            Due: {formatted.dueDate}
+                          </span>
+                        </div>
                       </div>
-                      <p className="text-sm text-on-surface-variant">
-                        Task: <span className="font-semibold">{task.title}</span>
-                      </p>
-                      <p className="text-xs text-on-surface-variant mt-1">
-                        Assigned by: {formatted.createdBy}
-                      </p>
-                    </div>
-                    <div className="flex flex-col items-end gap-2">
-                      <StatusBadge
-                        label={formatted.priority}
-                        tone={formatted.priority === "Critical" ? "danger" : "warning"}
-                      />
-                      <span className="text-xs font-semibold text-on-surface-variant">
-                        Due: {formatted.dueDate}
-                      </span>
-                      <div className="flex gap-2 mt-1">
+
+                      <div className="flex gap-2 mt-2">
                         {!task.acknowledged && task.status !== "COMPLETED" && (
                           <Button
                             size="sm"
                             variant="secondary"
                             disabled={actionLoading === task.id + "-ack"}
                             onClick={() => acknowledgeTask(task.id)}
-                            className="text-xs h-7 px-3"
+                            className="text-[10px] h-7 px-2.5 flex-1"
                           >
-                            {actionLoading === task.id + "-ack" ? "..." : "Acknowledge"}
+                            {actionLoading === task.id + "-ack" ? "…" : "Acknowledge"}
                           </Button>
                         )}
                         {task.status !== "COMPLETED" && (
@@ -173,9 +339,9 @@ export default function NurseDashboardPage() {
                             size="sm"
                             disabled={actionLoading === task.id + "-complete"}
                             onClick={() => completeTask(task.id)}
-                            className="text-xs h-7 px-3 bg-green-600 hover:bg-green-700 text-white"
+                            className="text-[10px] h-7 px-2.5 flex-1 bg-green-600 hover:bg-green-700 text-white"
                           >
-                            {actionLoading === task.id + "-complete" ? "..." : "Complete"}
+                            {actionLoading === task.id + "-complete" ? "…" : "Complete"}
                           </Button>
                         )}
                         {task.status === "COMPLETED" && (
@@ -185,68 +351,12 @@ export default function NurseDashboardPage() {
                         )}
                       </div>
                     </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </section>
-      )}
-
-      {loading && (
-        <div className="rounded-xl bg-surface-lowest shadow-[0_8px_32px_rgba(25,28,30,0.04)] backdrop-blur-md p-6">
-          <p className="text-sm text-on-surface-variant">Loading assigned tasks...</p>
-        </div>
-      )}
-
-      {error && (
-        <div className="rounded-xl bg-surface-lowest shadow-[0_8px_32px_rgba(25,28,30,0.04)] backdrop-blur-md p-6">
-          <p className="text-sm text-red-500">Error: {error}</p>
-        </div>
-      )}
-
-      {!loading && assignedTasks.length === 0 && !error && (
-        <div className="rounded-xl bg-surface-lowest shadow-[0_8px_32px_rgba(25,28,30,0.04)] backdrop-blur-md p-6">
-          <p className="text-sm text-on-surface-variant">No tasks assigned at this time.</p>
-        </div>
-      )}
-
-      <section className="grid grid-cols-1 gap-8 md:grid-cols-2">
-        <article className="rounded-xl bg-surface-lowest shadow-[0_8px_32px_rgba(25,28,30,0.04)] backdrop-blur-md p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <AlertTriangle className="size-5 text-secondary" />
-            <h2 className="text-lg font-bold text-on-surface">Alert Queue</h2>
-          </div>
-          <div className="space-y-3">
-            {nurseAlerts.map((alert) => (
-              <div
-                key={alert.id}
-                className="p-3 rounded-lg border-l-2 border-secondary bg-secondary/5 text-sm text-on-surface"
-              >
-                <p className="font-semibold">{alert.title}</p>
-                <p className="text-xs text-on-surface-variant mt-1">{alert.patientName} - {alert.source}</p>
+                  );
+                })}
               </div>
-            ))}
+            )}
           </div>
-        </article>
-
-        <article className="rounded-xl bg-surface-lowest shadow-[0_8px_32px_rgba(25,28,30,0.04)] backdrop-blur-md p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <Clock className="size-5 text-tertiary" />
-            <h2 className="text-lg font-bold text-on-surface">Timeline</h2>
-          </div>
-          <div className="space-y-3">
-            {nurseTimeline.map((item) => (
-              <div key={item.id} className="flex gap-3">
-                <div className="w-2 h-2 rounded-full bg-tertiary mt-2 flex-shrink-0" />
-                <div className="text-sm">
-                  <p className="font-semibold text-on-surface">{item.title}</p>
-                  <p className="text-xs text-on-surface-variant">{item.time}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </article>
+        </aside>
       </section>
     </div>
   );

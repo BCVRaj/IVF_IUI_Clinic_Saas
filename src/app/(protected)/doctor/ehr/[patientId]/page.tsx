@@ -398,7 +398,7 @@ function Field({
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-export default function PatientEHRPage() {
+export default function PatientEHRPage({ isNurseView = false }: { isNurseView?: boolean } = {}) {
   const params = useParams();
   const patientId = params.patientId as string;
 
@@ -413,7 +413,7 @@ export default function PatientEHRPage() {
   const [prescribeLoading, setPrescribeLoading] = useState(false);
   const [prescribeSuccess, setPrescribeSuccess] = useState(false);
   const [prescribeError, setPrescribeError] = useState<string | null>(null);
-  const [prescribeForm, setPrescribeForm] = useState({
+  const emptyMed = () => ({
     medicationName: "",
     dose: "",
     route: "Oral",
@@ -422,6 +422,7 @@ export default function PatientEHRPage() {
     endDate: "",
     instructions: "",
   });
+  const [prescribeForms, setPrescribeForms] = useState([emptyMed()]);
 
   // ── Clinical modals shared state ──
   const [clinicalLoading, setClinicalLoading] = useState(false);
@@ -589,29 +590,36 @@ export default function PatientEHRPage() {
     setPrescribeLoading(true);
     setPrescribeError(null);
     try {
-      const res = await fetch("/api/doctor/medications", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          patientId: patient.id,
-          cycleId: activeCycle?.id || null,
-          medicationName: prescribeForm.medicationName,
-          dose: prescribeForm.dose || null,
-          route: prescribeForm.route,
-          frequency: prescribeForm.frequency,
-          startDate: prescribeForm.startDate,
-          endDate: prescribeForm.endDate || null,
-          instructions: prescribeForm.instructions || null,
-        }),
-      });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error || "Failed to prescribe medication");
+      const results = await Promise.all(
+        prescribeForms.map((form) =>
+          fetch("/api/doctor/medications", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              patientId: patient.id,
+              cycleId: activeCycle?.id || null,
+              medicationName: form.medicationName,
+              dose: form.dose || null,
+              route: form.route,
+              frequency: form.frequency,
+              startDate: form.startDate,
+              endDate: form.endDate || null,
+              instructions: form.instructions || null,
+            }),
+          }).then(async (res) => {
+            const json = await res.json();
+            if (!res.ok) throw new Error(json.error || "Failed to prescribe medication");
+            return json;
+          })
+        )
+      );
+      void results;
       setPrescribeSuccess(true);
       await refreshPatient();
       setTimeout(() => {
         setPrescribeOpen(false);
         setPrescribeSuccess(false);
-        setPrescribeForm({ medicationName: "", dose: "", route: "Oral", frequency: "Daily", startDate: "", endDate: "", instructions: "" });
+        setPrescribeForms([emptyMed()]);
       }, 1800);
     } catch (err: unknown) {
       setPrescribeError(err instanceof Error ? err.message : "Unknown error");
@@ -766,7 +774,7 @@ export default function PatientEHRPage() {
       <div className="space-y-6">
         {/* Back */}
         <Link
-          href="/doctor/dashboard"
+          href={isNurseView ? "/nurse/dashboard" : "/doctor/dashboard"}
           className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-900"
         >
           <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
@@ -957,7 +965,7 @@ export default function PatientEHRPage() {
                 </div>
               </dl>
 
-              {patient.onboarding_status !== "CLEARED" && (
+              {patient.onboarding_status !== "CLEARED" && !isNurseView && (
                 <button
                   onClick={markCleared}
                   disabled={clearing}
@@ -1044,7 +1052,7 @@ export default function PatientEHRPage() {
           <div className="rounded-xl bg-white p-6 shadow-sm">
             <SectionHeader
               title="Medications"
-              onAdd={() => { setPrescribeOpen(true); setPrescribeError(null); }}
+              onAdd={isNurseView ? undefined : () => { setPrescribeOpen(true); setPrescribeError(null); }}
               addLabel="+ Prescribe New"
             />
             {!patient.medications?.length ? (
@@ -1542,47 +1550,127 @@ export default function PatientEHRPage() {
         <Modal
           title="Prescribe Medication"
           subtitle={`${patient.first_name} ${patient.last_name}${activeCycle ? ` · Active: ${activeCycle.status.replace(/_/g, " ")}` : ""}`}
-          onClose={() => setPrescribeOpen(false)}
+          onClose={() => { setPrescribeOpen(false); setPrescribeForms([emptyMed()]); setPrescribeError(null); setPrescribeSuccess(false); }}
         >
           {prescribeSuccess ? (
-            <ModalSuccess message="Medication prescribed successfully" />
+            <ModalSuccess message={`${prescribeForms.length} medication${prescribeForms.length > 1 ? "s" : ""} prescribed successfully`} />
           ) : (
             <form onSubmit={handlePrescribe} className="space-y-4">
               {prescribeError && (
                 <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{prescribeError}</div>
               )}
-              <Field label="Medication Name" required>
-                <input required value={prescribeForm.medicationName} onChange={(e) => setPrescribeForm((f) => ({ ...f, medicationName: e.target.value }))} placeholder="e.g. Gonal-F, Menopur, Progesterone" className={inputCls} />
-              </Field>
-              <div className="grid grid-cols-2 gap-3">
-                <Field label="Dose" optional>
-                  <input value={prescribeForm.dose} onChange={(e) => setPrescribeForm((f) => ({ ...f, dose: e.target.value }))} placeholder="e.g. 75 IU" className={inputCls} />
-                </Field>
-                <Field label="Route" required>
-                  <select required value={prescribeForm.route} onChange={(e) => setPrescribeForm((f) => ({ ...f, route: e.target.value }))} className={inputCls}>
-                    <option>Oral</option><option>Subcutaneous</option><option>Intramuscular</option>
-                    <option>Vaginal</option><option>Transdermal</option><option>Intravenous</option>
-                  </select>
-                </Field>
-              </div>
-              <Field label="Frequency" required>
-                <select required value={prescribeForm.frequency} onChange={(e) => setPrescribeForm((f) => ({ ...f, frequency: e.target.value }))} className={inputCls}>
-                  <option>Daily</option><option>Twice daily</option><option>Three times daily</option>
-                  <option>Every other day</option><option>Weekly</option><option>As needed</option>
-                </select>
-              </Field>
-              <div className="grid grid-cols-2 gap-3">
-                <Field label="Start Date" required>
-                  <input required type="date" value={prescribeForm.startDate} onChange={(e) => setPrescribeForm((f) => ({ ...f, startDate: e.target.value }))} className={inputCls} />
-                </Field>
-                <Field label="End Date" optional>
-                  <input type="date" value={prescribeForm.endDate} onChange={(e) => setPrescribeForm((f) => ({ ...f, endDate: e.target.value }))} className={inputCls} />
-                </Field>
-              </div>
-              <Field label="Instructions" optional>
-                <textarea rows={2} value={prescribeForm.instructions} onChange={(e) => setPrescribeForm((f) => ({ ...f, instructions: e.target.value }))} placeholder="e.g. Take with food, inject in abdomen..." className={`${inputCls} resize-none`} />
-              </Field>
-              <ModalActions onCancel={() => setPrescribeOpen(false)} loading={prescribeLoading} label="Prescribe" />
+
+              {prescribeForms.map((form, idx) => (
+                <div
+                  key={idx}
+                  className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3"
+                >
+                  {/* Medication header row */}
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold uppercase tracking-wider text-[#1A237E]">
+                      Medication {prescribeForms.length > 1 ? `#${idx + 1}` : ""}
+                    </span>
+                    {prescribeForms.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => setPrescribeForms((prev) => prev.filter((_, i) => i !== idx))}
+                        className="rounded-full px-2.5 py-0.5 text-xs font-bold text-red-500 hover:bg-red-100 transition-colors"
+                      >
+                        ✕ Remove
+                      </button>
+                    )}
+                  </div>
+
+                  <Field label="Medication Name" required>
+                    <input
+                      required
+                      value={form.medicationName}
+                      onChange={(e) => setPrescribeForms((prev) => prev.map((f, i) => i === idx ? { ...f, medicationName: e.target.value } : f))}
+                      placeholder="e.g. Gonal-F, Menopur, Progesterone"
+                      className={inputCls}
+                    />
+                  </Field>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <Field label="Dose" optional>
+                      <input
+                        value={form.dose}
+                        onChange={(e) => setPrescribeForms((prev) => prev.map((f, i) => i === idx ? { ...f, dose: e.target.value } : f))}
+                        placeholder="e.g. 75 IU"
+                        className={inputCls}
+                      />
+                    </Field>
+                    <Field label="Route" required>
+                      <select
+                        required
+                        value={form.route}
+                        onChange={(e) => setPrescribeForms((prev) => prev.map((f, i) => i === idx ? { ...f, route: e.target.value } : f))}
+                        className={inputCls}
+                      >
+                        <option>Oral</option><option>Subcutaneous</option><option>Intramuscular</option>
+                        <option>Vaginal</option><option>Transdermal</option><option>Intravenous</option>
+                      </select>
+                    </Field>
+                  </div>
+
+                  <Field label="Frequency" required>
+                    <select
+                      required
+                      value={form.frequency}
+                      onChange={(e) => setPrescribeForms((prev) => prev.map((f, i) => i === idx ? { ...f, frequency: e.target.value } : f))}
+                      className={inputCls}
+                    >
+                      <option>Daily</option><option>Twice daily</option><option>Three times daily</option>
+                      <option>Every other day</option><option>Weekly</option><option>As needed</option>
+                    </select>
+                  </Field>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <Field label="Start Date" required>
+                      <input
+                        required
+                        type="date"
+                        value={form.startDate}
+                        onChange={(e) => setPrescribeForms((prev) => prev.map((f, i) => i === idx ? { ...f, startDate: e.target.value } : f))}
+                        className={inputCls}
+                      />
+                    </Field>
+                    <Field label="End Date" optional>
+                      <input
+                        type="date"
+                        value={form.endDate}
+                        onChange={(e) => setPrescribeForms((prev) => prev.map((f, i) => i === idx ? { ...f, endDate: e.target.value } : f))}
+                        className={inputCls}
+                      />
+                    </Field>
+                  </div>
+
+                  <Field label="Instructions" optional>
+                    <textarea
+                      rows={2}
+                      value={form.instructions}
+                      onChange={(e) => setPrescribeForms((prev) => prev.map((f, i) => i === idx ? { ...f, instructions: e.target.value } : f))}
+                      placeholder="e.g. Take with food, inject in abdomen..."
+                      className={`${inputCls} resize-none`}
+                    />
+                  </Field>
+                </div>
+              ))}
+
+              {/* Add Medicine button */}
+              <button
+                type="button"
+                onClick={() => setPrescribeForms((prev) => [...prev, emptyMed()])}
+                className="w-full rounded-lg border-2 border-dashed border-[#1A237E]/30 py-2.5 text-xs font-bold uppercase tracking-wider text-[#1A237E] transition-colors hover:border-[#1A237E] hover:bg-blue-50"
+              >
+                + Add Medicine
+              </button>
+
+              <ModalActions
+                onCancel={() => { setPrescribeOpen(false); setPrescribeForms([emptyMed()]); setPrescribeError(null); }}
+                loading={prescribeLoading}
+                label={prescribeForms.length > 1 ? `Prescribe All (${prescribeForms.length})` : "Prescribe"}
+              />
             </form>
           )}
         </Modal>

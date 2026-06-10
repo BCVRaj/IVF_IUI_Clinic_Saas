@@ -93,10 +93,15 @@ export async function POST(request: NextRequest) {
       partner1LastName,
       partner1Dob,
       partner1Sex,
+      partner1Email,
+      partner1Phone,
+      partner1Address,
       partner2FirstName,
       partner2LastName,
       partner2Dob,
       partner2Sex,
+      partner2Email,
+      partner2Phone,
       hasInsurance,
       packageType,
       paymentPlan,
@@ -113,6 +118,14 @@ export async function POST(request: NextRequest) {
     if (!partner1FirstName || !partner1LastName || !eSignature) {
       return NextResponse.json(
         { error: "Missing required fields: partner1FirstName, partner1LastName, eSignature" },
+        { status: 400 }
+      );
+    }
+
+    // Validate real email is provided
+    if (!partner1Email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(partner1Email.trim())) {
+      return NextResponse.json(
+        { error: "A valid email address for Partner 1 is required." },
         { status: 400 }
       );
     }
@@ -177,9 +190,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Unique email for this patient (UNIQUE constraint on patients.email)
-    const timestamp = Date.now();
-    const email = `${partner1FirstName.toLowerCase()}.${partner1LastName.toLowerCase()}.${timestamp}@clinic.internal`;
+    // Use real email provided by nurse — replaces fake clinic email
+    const email = partner1Email.trim().toLowerCase();
 
     // Map biological sex to DB enum
     const genderMap: Record<string, string> = { Female: "F", Male: "M", Other: "OTHER" };
@@ -189,8 +201,8 @@ export async function POST(request: NextRequest) {
     const created = await ensureAuthProfile(email, partner1FirstName, partner1LastName, "PATIENT");
     if (!created) {
       return NextResponse.json(
-        { error: "Failed to create patient auth account. Ensure SUPABASE_SERVICE_ROLE_KEY is set." },
-        { status: 500 }
+        { error: "This email address is already registered. Please use a different email for this patient." },
+        { status: 400 }
       );
     }
 
@@ -202,6 +214,8 @@ export async function POST(request: NextRequest) {
         first_name: partner1FirstName,
         last_name: partner1LastName,
         email,
+        phone: partner1Phone || null,
+        address: partner1Address || null,
         date_of_birth: partner1Dob || null,
         gender,
         marital_status: maritalStatus || null,
@@ -211,6 +225,8 @@ export async function POST(request: NextRequest) {
             last_name: partner2LastName || null,
             dob: partner2Dob || null,
             sex: partner2Sex || null,
+            email: partner2Email || null,
+            phone: partner2Phone || null,
           },
           insurance: hasInsurance,
           packageType,
@@ -322,7 +338,7 @@ export async function GET(request: NextRequest) {
     // since the nurse needs to see the queue. Let's return all patients for the clinic.
     const { data: patients, error } = await supabaseServer
       .from("patients")
-      .select("id, first_name, last_name, onboarding_status, nartsr_id, marriage_cert_verified");
+      .select("id, first_name, last_name, email, date_of_birth, gender, onboarding_status, nartsr_id, marriage_cert_verified");
 
     if (error) {
       throw error;

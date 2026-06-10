@@ -1,7 +1,7 @@
 export const doctorStats = [
   { id: "d1", label: "Patients Today", value: "42", detail: "+12% vs LW", tone: "navy" },
   { id: "d2", label: "Critical Cases", value: "03", detail: "Requires intervention", tone: "red" },
-  { id: "d3", label: "Pending Lab Reviews", value: "14", detail: "75% throughput", tone: "teal" },
+  { id: "d3", label: "Pending Patients KYC", value: "14", detail: "75% throughput", tone: "teal" },
   { id: "d4", label: "Active IVF Cycles", value: "28", detail: "Across all units", tone: "dark" },
 ] as const;
 

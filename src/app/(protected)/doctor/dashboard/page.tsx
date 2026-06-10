@@ -71,7 +71,12 @@ export default function DoctorDashboardPage() {
       </div>
 
       <section className="grid grid-cols-1 gap-6 md:grid-cols-4">
-        {doctorStats.map((stat) => (
+        {[
+          { id: "d1", label: "Patients Today", value: patients.length.toString(), detail: "Currently registered", tone: "navy" },
+          { id: "d2", label: "Critical Cases", value: doctorAlerts.filter(a => a.severity === 'critical').length.toString().padStart(2, '0'), detail: "Requires intervention", tone: "red" },
+          { id: "d3", label: "Pending Patients KYC", value: patients.filter(p => p.onboarding_status !== "CLEARED").length.toString().padStart(2, '0'), detail: "Needs review", tone: "teal" },
+          { id: "d4", label: "Active IVF Cycles", value: "28", detail: "Across all units", tone: "dark" },
+        ].map((stat) => (
           <article
             key={stat.id}
             className={`min-h-[130px] p-6 rounded-xl relative overflow-hidden backdrop-blur-md ${

@@ -9,10 +9,15 @@ type FormState = {
   partner1LastName: string;
   partner1Dob: string;
   partner1Sex: string;
+  partner1Email: string;
+  partner1Phone: string;
+  partner1Address: string;
   partner2FirstName: string;
   partner2LastName: string;
   partner2Dob: string;
   partner2Sex: string;
+  partner2Email: string;
+  partner2Phone: string;
   hasInsurance: string;
   packageType: string;
   paymentPlan: string;
@@ -31,10 +36,15 @@ const initialState: FormState = {
   partner1LastName: "",
   partner1Dob: "",
   partner1Sex: "",
+  partner1Email: "",
+  partner1Phone: "",
+  partner1Address: "",
   partner2FirstName: "",
   partner2LastName: "",
   partner2Dob: "",
   partner2Sex: "",
+  partner2Email: "",
+  partner2Phone: "",
   hasInsurance: "yes",
   packageType: "Standard IVF",
   paymentPlan: "Monthly Installments",
@@ -75,6 +85,7 @@ export function OnboardingWizard() {
     return (
       formData.partner1FirstName &&
       formData.partner1LastName &&
+      formData.partner1Email &&
       formData.partner2FirstName &&
       formData.partner2LastName &&
       formData.eSignature
@@ -214,6 +225,18 @@ export function OnboardingWizard() {
                     <option>Other</option>
                   </select>
                 </div>
+                <div>
+                  <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-500">Email Address <span className="text-red-500">*</span></label>
+                  <input className="w-full rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm focus:border-[#1A237E] focus:outline-none" type="email" placeholder="patient@gmail.com" value={formData.partner1Email} onChange={(e) => update("partner1Email", e.target.value)} />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-500">Phone Number</label>
+                  <input className="w-full rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm focus:border-[#1A237E] focus:outline-none" type="tel" placeholder="+91 98765 43210" value={formData.partner1Phone} onChange={(e) => update("partner1Phone", e.target.value)} />
+                </div>
+                <div className="col-span-2">
+                  <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-500">Address</label>
+                  <textarea className="w-full rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm focus:border-[#1A237E] focus:outline-none resize-none" rows={2} placeholder="Street, City, State, PIN" value={formData.partner1Address} onChange={(e) => update("partner1Address", e.target.value)} />
+                </div>
               </div>
             </section>
             <section className="rounded-xl bg-white p-6 shadow-sm">
@@ -239,6 +262,14 @@ export function OnboardingWizard() {
                     <option>Male</option>
                     <option>Other</option>
                   </select>
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-500">Email Address</label>
+                  <input className="w-full rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm focus:border-[#1A237E] focus:outline-none" type="email" placeholder="partner@gmail.com" value={formData.partner2Email} onChange={(e) => update("partner2Email", e.target.value)} />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-500">Phone Number</label>
+                  <input className="w-full rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm focus:border-[#1A237E] focus:outline-none" type="tel" placeholder="+91 98765 43210" value={formData.partner2Phone} onChange={(e) => update("partner2Phone", e.target.value)} />
                 </div>
               </div>
             </section>
@@ -484,6 +515,14 @@ export function OnboardingWizard() {
                 <p>Package: {formData.packageType}</p>
                 <p>Payment Plan: {formData.paymentPlan}</p>
                 <p>E-Signature: {formData.eSignature || "Pending"}</p>
+              </div>
+              <div className="rounded-lg bg-slate-50 p-4 md:col-span-2">
+                <p className="font-bold text-slate-700">Contact Details</p>
+                <p>Partner 1 Email: {formData.partner1Email || "Not provided"}</p>
+                <p>Partner 1 Phone: {formData.partner1Phone || "Not provided"}</p>
+                <p>Address: {formData.partner1Address || "Not provided"}</p>
+                {formData.partner2Email && <p>Partner 2 Email: {formData.partner2Email}</p>}
+                {formData.partner2Phone && <p>Partner 2 Phone: {formData.partner2Phone}</p>}
               </div>
               <div className="rounded-lg bg-slate-50 p-4 md:col-span-2">
                 <p className="font-bold text-slate-700">Regulatory Summary</p>
