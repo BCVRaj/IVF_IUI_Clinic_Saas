@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseServer } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/server";
 
 export async function GET(
   request: NextRequest,
@@ -7,7 +7,7 @@ export async function GET(
 ) {
   try {
     const { patientId } = await params;
-    const { data, error } = await supabaseServer
+    const { data, error } = await supabase
       .from("compliance_documents")
       .select("*")
       .eq("patient_id", patientId)
@@ -37,6 +37,7 @@ export async function POST(
 ) {
   try {
     const token = request.cookies.get("sb-auth-token")?.value;
+    const supabase = await createClient();
     const isDevMode = process.env.NODE_ENV === "development";
     const { patientId } = await params;
     const { formType, fileUrl } = await request.json();
@@ -47,7 +48,7 @@ export async function POST(
 
     // Upsert or insert depending on if they are overwriting
     // For simplicity we just insert a new record
-    const { data, error } = await supabaseServer
+    const { data, error } = await supabase
       .from("compliance_documents")
       .insert([
         {
@@ -76,6 +77,7 @@ export async function PUT(
 ) {
   try {
     const token = request.cookies.get("sb-auth-token")?.value;
+    const supabase = await createClient();
     const isDevMode = process.env.NODE_ENV === "development";
     const { patientId } = await params;
     const { documentId, status } = await request.json();
@@ -90,9 +92,9 @@ export async function PUT(
     if (status === "VERIFIED") {
       signedAt = new Date().toISOString();
       if (!isDevMode && token) {
-        const { data: authData } = await supabaseServer.auth.getUser(token);
+        const { data: authData, error: authError } = await supabase.auth.getUser();
         if (authData?.user) {
-          const { data: p } = await supabaseServer
+          const { data: p } = await supabase
             .from("user_profiles")
             .select("id")
             .eq("auth_id", authData.user.id)
@@ -106,7 +108,7 @@ export async function PUT(
     if (verifiedBy) updates.verified_by = verifiedBy;
     if (signedAt) updates.signed_at = signedAt;
 
-    const { data, error } = await supabaseServer
+    const { data, error } = await supabase
       .from("compliance_documents")
       .update(updates)
       .eq("id", documentId)

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseServer } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/server";
 
 export async function POST(request: NextRequest) {
   try {
@@ -12,8 +12,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Sign in with Supabase Auth
-    const { data, error } = await supabaseServer.auth.signInWithPassword({
+    const supabase = await createClient();
+
+    // Sign in with Supabase Auth using cookie-aware server client
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
@@ -32,54 +34,41 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get user profile
-    const { data: profile, error: profileError } = await supabaseServer
-      .from("user_profiles")
-      .select("*")
-      .eq("auth_id", data.user.id)
+    // Get user role from public.profiles
+    let { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", data.user.id)
       .single();
 
-    if (profileError) {
+    if ((profileError || !profile) && data.user.email) {
+      const { data: fallbackProfile, error: fallbackError } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("email", data.user.email)
+        .single();
+
+      if (!fallbackError && fallbackProfile) {
+        profile = fallbackProfile;
+        profileError = null;
+      }
+    }
+
+    if (profileError || !profile?.role) {
       return NextResponse.json(
-        { error: "User profile not found" },
-        { status: 404 }
+        { error: "Your account is not authorized." },
+        { status: 403 }
       );
     }
 
-    // Create response with JWT token in httpOnly cookie
-    const response = NextResponse.json({
+    return NextResponse.json({
       success: true,
       user: {
         id: data.user.id,
         email: data.user.email,
-        role: profile?.role,
-        firstName: profile?.first_name,
-        lastName: profile?.last_name,
+        role: profile.role,
       },
-      token: data.session.access_token,
     });
-
-    // Set secure httpOnly cookie with JWT
-    response.cookies.set({
-      name: "sb-auth-token",
-      value: data.session.access_token,
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: 60 * 60 * 24 * 7,
-    });
-
-    // Set role cookie (readable by middleware for route protection)
-    response.cookies.set({
-      name: "sb-user-role",
-      value: profile?.role || "",
-      httpOnly: false,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: 60 * 60 * 24 * 7,
-    });
-
-    return response;
   } catch (error: any) {
     return NextResponse.json(
       { error: error.message || "Internal server error" },

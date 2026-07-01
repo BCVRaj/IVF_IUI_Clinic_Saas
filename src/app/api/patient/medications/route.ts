@@ -1,19 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseServer } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/server";
 
 export async function GET(request: NextRequest) {
   try {
-    const token = request.cookies.get("sb-auth-token")?.value;
-    if (!token) {
+    const supabase = await createClient();
+    const { data: authData, error: authError } = await supabase.auth.getUser();
+    if (authError || !authData.user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { data: authData } = await supabaseServer.auth.getUser(token);
-    if (!authData.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const { data: profile } = await supabaseServer
+    const { data: profile } = await supabase
       .from("user_profiles")
       .select("*")
       .eq("auth_id", authData.user.id)
@@ -23,13 +19,13 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Only patients can access this" }, { status: 403 });
     }
 
-    const { data: patient } = await supabaseServer
+    const { data: patient } = await supabase
       .from("patients")
       .select("id")
       .eq("user_profile_id", profile.id)
       .single();
 
-    const { data: medications } = await supabaseServer
+    const { data: medications } = await supabase
       .from("medications")
       .select(`
         id,

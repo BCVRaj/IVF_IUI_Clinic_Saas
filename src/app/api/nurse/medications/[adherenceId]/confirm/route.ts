@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseServer } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/server";
 
 export async function PUT(
   request: NextRequest,
@@ -7,6 +7,7 @@ export async function PUT(
 ) {
   try {
     const token = request.cookies.get("sb-auth-token")?.value;
+    const supabase = await createClient();
     if (!token) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -18,12 +19,12 @@ export async function PUT(
       return NextResponse.json({ error: "Invalid status" }, { status: 400 });
     }
 
-    const { data: authData } = await supabaseServer.auth.getUser(token);
+    const { data: authData, error: authError } = await supabase.auth.getUser();
     if (!authData.user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { data: nurseProfile } = await supabaseServer
+    const { data: nurseProfile } = await supabase
       .from("user_profiles")
       .select("*")
       .eq("auth_id", authData.user.id)
@@ -33,7 +34,7 @@ export async function PUT(
       return NextResponse.json({ error: "Only nurses can confirm adherence" }, { status: 403 });
     }
 
-    const { data: updated, error } = await supabaseServer
+    const { data: updated, error } = await supabase
       .from("medication_adherence")
       .update({
         status,

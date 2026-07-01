@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseServer } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/server";
 
 export async function POST(request: NextRequest) {
   try {
     const token = request.cookies.get("sb-auth-token")?.value;
+    const supabase = await createClient();
     const isDevMode = process.env.NODE_ENV === "development";
 
     const { patientId, cycleId, medicationName, dose, route, frequency, startDate, endDate, instructions } =
@@ -16,11 +17,11 @@ export async function POST(request: NextRequest) {
     let doctorProfile: { id: string; role: string } | null = null;
 
     if (token) {
-      const { data: authData } = await supabaseServer.auth.getUser(token);
+      const { data: authData, error: authError } = await supabase.auth.getUser();
       if (!authData.user) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
       }
-      const { data: profile } = await supabaseServer
+      const { data: profile } = await supabase
         .from("user_profiles")
         .select("*")
         .eq("auth_id", authData.user.id)
@@ -28,7 +29,7 @@ export async function POST(request: NextRequest) {
       doctorProfile = profile;
     } else if (isDevMode) {
       // Dev mode: no token → use first available DOCTOR profile
-      const { data: profile } = await supabaseServer
+      const { data: profile } = await supabase
         .from("user_profiles")
         .select("*")
         .eq("role", "DOCTOR")
@@ -48,7 +49,7 @@ export async function POST(request: NextRequest) {
 
     if (!finalCycleId) {
       // Find the most recent cycle for this patient
-      const { data: latestCycle } = await supabaseServer
+      const { data: latestCycle } = await supabase
         .from("ivf_cycles")
         .select("id")
         .eq("patient_id", patientId)
@@ -60,7 +61,7 @@ export async function POST(request: NextRequest) {
         finalCycleId = latestCycle.id;
       } else {
         // Auto-create a prep cycle since the database requires a cycle_id for medications
-        const { data: newCycle, error: cycleError } = await supabaseServer
+        const { data: newCycle, error: cycleError } = await supabase
           .from("ivf_cycles")
           .insert({
             patient_id: patientId,
@@ -79,7 +80,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const { data: medication, error } = await supabaseServer
+    const { data: medication, error } = await supabase
       .from("medications")
       .insert({
         patient_id: patientId,
@@ -115,7 +116,7 @@ export async function POST(request: NextRequest) {
       currentDate.setDate(currentDate.getDate() + 1);
     }
 
-    await supabaseServer.from("medication_adherence").insert(adherenceRecords);
+    await supabase.from("medication_adherence").insert(adherenceRecords);
 
     return NextResponse.json(
       { success: true, message: "Medication prescribed", data: medication },

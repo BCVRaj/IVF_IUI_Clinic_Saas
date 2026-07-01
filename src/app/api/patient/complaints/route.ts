@@ -1,19 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseServer } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/server";
 
 // GET — returns complaints for the logged-in patient (or all for nurse in dev mode)
 export async function GET(request: NextRequest) {
   try {
     const token = request.cookies.get("sb-auth-token")?.value;
+    const supabase = await createClient();
     const isDevMode = process.env.NODE_ENV === "development";
 
-    if (!supabaseServer) return NextResponse.json({ data: [] });
+    if (!supabase) return NextResponse.json({ data: [] });
 
     // If authenticated, filter by patient
     if (token) {
-      const { data: authData } = await supabaseServer.auth.getUser(token);
+      const { data: authData, error: authError } = await supabase.auth.getUser();
       if (authData?.user) {
-        const { data: profile } = await supabaseServer
+        const { data: profile } = await supabase
           .from("user_profiles")
           .select("id, role")
           .eq("auth_id", authData.user.id)
@@ -21,7 +22,7 @@ export async function GET(request: NextRequest) {
 
         if (profile?.role === "PATIENT") {
           // Find the patient record
-          const { data: patient } = await supabaseServer
+          const { data: patient } = await supabase
             .from("patients")
             .select("id")
             .eq("user_profile_id", profile.id)
@@ -29,7 +30,7 @@ export async function GET(request: NextRequest) {
 
           if (!patient) return NextResponse.json({ data: [] });
 
-          const { data, error } = await supabaseServer
+          const { data, error } = await supabase
             .from("patient_complaints")
             .select("id, patient_id, complaint_text, severity, status, created_at, updated_at, nurse_notes, doctor_notes")
             .eq("patient_id", patient.id)
@@ -41,7 +42,7 @@ export async function GET(request: NextRequest) {
 
         if (profile?.role === "NURSE") {
           // Nurse sees complaints from their assigned patients
-          const { data: assignments } = await supabaseServer
+          const { data: assignments } = await supabase
             .from("nurse_patient_assignments")
             .select("patient_id")
             .eq("nurse_id", profile.id)
@@ -51,7 +52,7 @@ export async function GET(request: NextRequest) {
 
           if (patientIds.length === 0) return NextResponse.json({ data: [] });
 
-          const { data, error } = await supabaseServer
+          const { data, error } = await supabase
             .from("patient_complaints")
             .select("id, patient_id, complaint_text, severity, status, created_at, updated_at, nurse_notes")
             .in("patient_id", patientIds)
@@ -65,7 +66,7 @@ export async function GET(request: NextRequest) {
 
     // Dev mode fallback — return all complaints
     if (isDevMode) {
-      const { data } = await supabaseServer
+      const { data } = await supabase
         .from("patient_complaints")
         .select("id, patient_id, complaint_text, severity, status, created_at, updated_at, nurse_notes")
         .order("created_at", { ascending: false });
@@ -83,6 +84,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const token = request.cookies.get("sb-auth-token")?.value;
+    const supabase = await createClient();
     const isDevMode = process.env.NODE_ENV === "development";
 
     const { complaintText, severity, category } = await request.json();
@@ -94,16 +96,16 @@ export async function POST(request: NextRequest) {
     let patientId: string | null = null;
 
     if (token) {
-      const { data: authData } = await supabaseServer.auth.getUser(token);
+      const { data: authData, error: authError } = await supabase.auth.getUser();
       if (authData?.user) {
-        const { data: profile } = await supabaseServer
+        const { data: profile } = await supabase
           .from("user_profiles")
           .select("id, role")
           .eq("auth_id", authData.user.id)
           .single();
 
         if (profile?.role === "PATIENT") {
-          const { data: patient } = await supabaseServer
+          const { data: patient } = await supabase
             .from("patients")
             .select("id")
             .eq("user_profile_id", profile.id)
@@ -113,7 +115,7 @@ export async function POST(request: NextRequest) {
       }
     } else if (isDevMode) {
       // Dev mode: use first patient
-      const { data: patient } = await supabaseServer
+      const { data: patient } = await supabase
         .from("patients")
         .select("id")
         .limit(1)
@@ -131,7 +133,7 @@ export async function POST(request: NextRequest) {
     const severityMap: Record<string, string> = { "1": "LOW", "2": "LOW", "3": "NORMAL", "4": "HIGH", "5": "URGENT" };
     const dbSeverity = severityMap[String(severity)] || "NORMAL";
 
-    const { data: complaint, error } = await supabaseServer
+    const { data: complaint, error } = await supabase
       .from("patient_complaints")
       .insert({
         patient_id: patientId,

@@ -1,21 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseServer } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/server";
 
 export async function GET(request: NextRequest) {
   try {
     const token = request.cookies.get("sb-auth-token")?.value;
+    const supabase = await createClient();
     const isDevMode = process.env.NODE_ENV === "development";
 
     let nurseProfileId: string = "";
 
     if (token) {
       // Real authentication
-      const { data: authData } = await supabaseServer.auth.getUser(token);
+      const { data: authData, error: authError } = await supabase.auth.getUser();
       if (!authData.user) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
       }
 
-      const { data: profile } = await supabaseServer
+      const { data: profile } = await supabase
         .from("user_profiles")
         .select("*")
         .eq("auth_id", authData.user.id)
@@ -27,7 +28,7 @@ export async function GET(request: NextRequest) {
       nurseProfileId = profile.id;
     } else if (isDevMode) {
       // Development mode
-      const { data: profile } = await supabaseServer
+      const { data: profile } = await supabase
         .from("user_profiles")
         .select("*")
         .eq("role", "NURSE")
@@ -45,7 +46,7 @@ export async function GET(request: NextRequest) {
 
     // Now if nurseProfileId isn't empty, try to fetch tasks
     if (nurseProfileId) {
-       const { data: tasks, error } = await supabaseServer
+       const { data: tasks, error } = await supabase
         .from("coordination_tasks")
         .select(`
           *,

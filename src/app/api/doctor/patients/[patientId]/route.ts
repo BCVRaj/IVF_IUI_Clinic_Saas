@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseServer } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/server";
 
 export async function GET(
   request: NextRequest,
@@ -7,6 +7,7 @@ export async function GET(
 ) {
   try {
     const token = request.cookies.get("sb-auth-token")?.value;
+    const supabase = await createClient();
     const isDevMode = process.env.NODE_ENV === "development";
     const { patientId } = await params;
 
@@ -19,12 +20,12 @@ export async function GET(
       // Fall through to the patient fetch below without role/assignment checks
     } else {
       // Authenticated flow
-      const { data: authData } = await supabaseServer.auth.getUser(token);
+      const { data: authData, error: authError } = await supabase.auth.getUser();
       if (!authData.user) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
       }
 
-      const { data: profile } = await supabaseServer
+      const { data: profile } = await supabase
         .from("user_profiles")
         .select("*")
         .eq("auth_id", authData.user.id)
@@ -32,7 +33,7 @@ export async function GET(
 
       // Check role-based access
       if (profile?.role === "DOCTOR") {
-        const { data: assignment } = await supabaseServer
+        const { data: assignment } = await supabase
           .from("doctor_patient_assignments")
           .select("id")
           .eq("doctor_id", profile.id)
@@ -47,7 +48,7 @@ export async function GET(
           );
         }
       } else if (profile?.role === "NURSE") {
-        const { data: assignment } = await supabaseServer
+        const { data: assignment } = await supabase
           .from("nurse_patient_assignments")
           .select("id")
           .eq("nurse_id", profile.id)
@@ -61,7 +62,7 @@ export async function GET(
           );
         }
       } else if (profile?.role === "PATIENT") {
-        const { data: patientRow } = await supabaseServer
+        const { data: patientRow } = await supabase
           .from("patients")
           .select("user_profile_id")
           .eq("id", patientId)
@@ -75,7 +76,7 @@ export async function GET(
     }
 
     // Get patient details with related data
-    const { data: patient, error: patientError } = await supabaseServer
+    const { data: patient, error: patientError } = await supabase
       .from("patients")
       .select(`
         *,
@@ -106,7 +107,7 @@ export async function GET(
 
     let kyc_documents = [];
     try {
-      const { data: docs } = await supabaseServer
+      const { data: docs } = await supabase
         .from("kyc_documents")
         .select("id, doc_type, file_url, status, created_at, verified_at")
         .eq("patient_id", patientId)
@@ -121,7 +122,7 @@ export async function GET(
 
     let clinical_history = [];
     try {
-      const { data: hist } = await supabaseServer
+      const { data: hist } = await supabase
         .from("clinical_history")
         .select("*")
         .eq("patient_id", patientId);
@@ -130,7 +131,7 @@ export async function GET(
 
     let semen_analysis = [];
     try {
-      const { data: sem } = await supabaseServer
+      const { data: sem } = await supabase
         .from("semen_analysis")
         .select("*")
         .eq("patient_id", patientId)
@@ -140,7 +141,7 @@ export async function GET(
 
     let scan_records = [];
     try {
-      const { data: scans } = await supabaseServer
+      const { data: scans } = await supabase
         .from("scan_records")
         .select("*")
         .eq("patient_id", patientId)
@@ -150,7 +151,7 @@ export async function GET(
 
     let stimulation_daily_log = [];
     try {
-      const { data: stim } = await supabaseServer
+      const { data: stim } = await supabase
         .from("stimulation_daily_log")
         .select("*")
         .eq("patient_id", patientId)
@@ -160,7 +161,7 @@ export async function GET(
 
     let opu_records = [];
     try {
-      const { data: opu } = await supabaseServer
+      const { data: opu } = await supabase
         .from("opu_records")
         .select("*")
         .eq("patient_id", patientId)
@@ -170,7 +171,7 @@ export async function GET(
 
     let embryology_records = [];
     try {
-      const { data: emb } = await supabaseServer
+      const { data: emb } = await supabase
         .from("embryology_records")
         .select("*")
         .eq("patient_id", patientId)
@@ -180,7 +181,7 @@ export async function GET(
 
     let embryo_transfer_records = [];
     try {
-      const { data: trans } = await supabaseServer
+      const { data: trans } = await supabase
         .from("embryo_transfer_records")
         .select("*")
         .eq("patient_id", patientId)
@@ -190,7 +191,7 @@ export async function GET(
 
     let cycle_outcomes = [];
     try {
-      const { data: outcomes } = await supabaseServer
+      const { data: outcomes } = await supabase
         .from("cycle_outcomes")
         .select("*")
         .eq("patient_id", patientId)
@@ -200,7 +201,7 @@ export async function GET(
 
     let billing_records = [];
     try {
-      const { data: bill } = await supabaseServer
+      const { data: bill } = await supabase
         .from("billing_records")
         .select("*")
         .eq("patient_id", patientId)
@@ -238,6 +239,7 @@ export async function PUT(
 ) {
   try {
     const token = request.cookies.get("sb-auth-token")?.value;
+    const supabase = await createClient();
     const isDevMode = process.env.NODE_ENV === "development";
     const { patientId } = await params;
 
@@ -251,12 +253,12 @@ export async function PUT(
       // Dev mode: no token → treat as DOCTOR so onboardingStatus CLEARED is allowed
       profile = { id: "dev", role: "DOCTOR" };
     } else {
-      const { data: authData } = await supabaseServer.auth.getUser(token);
+      const { data: authData, error: authError } = await supabase.auth.getUser();
       if (!authData.user) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
       }
 
-      const { data: p } = await supabaseServer
+      const { data: p } = await supabase
         .from("user_profiles")
         .select("*")
         .eq("auth_id", authData.user.id)
@@ -277,7 +279,7 @@ export async function PUT(
       }
       if (!isDevMode) {
         if (profile.role === "DOCTOR") {
-          const { data: assignment } = await supabaseServer
+          const { data: assignment } = await supabase
             .from("doctor_patient_assignments")
             .select("id")
             .eq("doctor_id", profile.id)
@@ -290,7 +292,7 @@ export async function PUT(
             );
           }
         } else {
-          const { data: assignment } = await supabaseServer
+          const { data: assignment } = await supabase
             .from("nurse_patient_assignments")
             .select("id")
             .eq("nurse_id", profile.id)
@@ -329,7 +331,7 @@ export async function PUT(
       updates.onboarding_status = onboardingStatus;
     }
 
-    const { data: updatedPatient, error: updateError } = await supabaseServer
+    const { data: updatedPatient, error: updateError } = await supabase
       .from("patients")
       .update(updates)
       .eq("id", patientId)
@@ -341,7 +343,7 @@ export async function PUT(
     }
 
     // Log in audit
-    await supabaseServer.from("audit_log").insert({
+    await supabase.from("audit_log").insert({
       user_id: profile!.id,
       action: "UPDATE_PATIENT_COMPLIANCE",
       table_name: "patients",

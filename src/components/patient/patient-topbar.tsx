@@ -1,5 +1,8 @@
+"use client"
+
 import { Bell, Flower2 } from "lucide-react";
 
+import { LogoutButton } from "@/components/auth/LogoutButton";
 import { patientUser } from "@/lib/mock-patient-data";
 
 export function PatientTopbar() {
@@ -18,6 +21,9 @@ export function PatientTopbar() {
         </button>
         <div className="flex size-9 items-center justify-center rounded-full bg-gradient-to-br from-emerald-500 to-emerald-600 text-xs font-bold text-white shadow-sm">
           {patientUser.initials}
+        </div>
+        <div className="hidden sm:block">
+          <LogoutButton />
         </div>
       </div>
     </header>

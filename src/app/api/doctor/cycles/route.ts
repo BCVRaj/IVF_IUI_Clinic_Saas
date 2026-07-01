@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseServer } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/server";
 
 export async function POST(request: NextRequest) {
   try {
     const token = request.cookies.get("sb-auth-token")?.value;
+    const supabase = await createClient();
     if (!token) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -16,12 +17,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { data: authData } = await supabaseServer.auth.getUser(token);
+    const { data: authData, error: authError } = await supabase.auth.getUser();
     if (!authData.user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { data: doctorProfile } = await supabaseServer
+    const { data: doctorProfile } = await supabase
       .from("user_profiles")
       .select("*")
       .eq("auth_id", authData.user.id)
@@ -36,7 +37,7 @@ export async function POST(request: NextRequest) {
 
     // NARTSR Legal Gate: Hard Block
     // Check if patient has a NARTSR ID before allowing a cycle to start
-    const { data: nartsrRecord, error: nartsrError } = await supabaseServer
+    const { data: nartsrRecord, error: nartsrError } = await supabase
       .from("nartsr_records")
       .select("registry_id")
       .eq("patient_id", patientId)
@@ -49,7 +50,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { data: cycle, error } = await supabaseServer
+    const { data: cycle, error } = await supabase
       .from("ivf_cycles")
       .insert({
         patient_id: patientId,
@@ -74,7 +75,7 @@ export async function POST(request: NextRequest) {
     ];
 
     for (const milestone of milestones) {
-      await supabaseServer.from("cycle_milestones").insert({
+      await supabase.from("cycle_milestones").insert({
         cycle_id: cycle.id,
         ...milestone,
         status: "PENDING",
@@ -92,17 +93,13 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
-    const token = request.cookies.get("sb-auth-token")?.value;
-    if (!token) {
+    const supabase = await createClient();
+    const { data: authData, error: authError } = await supabase.auth.getUser();
+    if (authError || !authData.user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { data: authData } = await supabaseServer.auth.getUser(token);
-    if (!authData.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const { data: profile } = await supabaseServer
+    const { data: profile } = await supabase
       .from("user_profiles")
       .select("*")
       .eq("auth_id", authData.user.id)
@@ -110,17 +107,17 @@ export async function GET(request: NextRequest) {
 
     let data, error;
     if (profile?.role === "DOCTOR") {
-      ({ data, error } = await supabaseServer
+      ({ data, error } = await supabase
         .from("ivf_cycles")
         .select("*")
         .eq("doctor_id", profile.id));
     } else if (profile?.role === "PATIENT") {
-      const { data: patientData } = await supabaseServer
+      const { data: patientData } = await supabase
         .from("patients")
         .select("id")
         .eq("user_profile_id", profile.id)
         .single();
-      ({ data, error } = await supabaseServer
+      ({ data, error } = await supabase
         .from("ivf_cycles")
         .select("*")
         .eq("patient_id", patientData?.id));

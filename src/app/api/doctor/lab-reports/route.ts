@@ -1,18 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseServer } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/server";
 
 // GET — returns lab reports for all patients assigned to this doctor
 export async function GET(request: NextRequest) {
   try {
     const token = request.cookies.get("sb-auth-token")?.value;
+    const supabase = await createClient();
     const isDevMode = process.env.NODE_ENV === "development";
 
     let doctorProfileId: string | null = null;
 
     if (token) {
-      const { data: authData } = await supabaseServer.auth.getUser(token);
+      const { data: authData, error: authError } = await supabase.auth.getUser();
       if (authData?.user) {
-        const { data: profile } = await supabaseServer
+        const { data: profile } = await supabase
           .from("user_profiles")
           .select("id")
           .eq("auth_id", authData.user.id)
@@ -21,7 +22,7 @@ export async function GET(request: NextRequest) {
         doctorProfileId = profile?.id ?? null;
       }
     } else if (isDevMode) {
-      const { data: profile } = await supabaseServer
+      const { data: profile } = await supabase
         .from("user_profiles")
         .select("id")
         .eq("role", "DOCTOR")
@@ -35,7 +36,7 @@ export async function GET(request: NextRequest) {
     if (!doctorProfileId) return NextResponse.json({ data: [] });
 
     // Get patients assigned to this doctor
-    const { data: assignments } = await supabaseServer
+    const { data: assignments } = await supabase
       .from("doctor_patient_assignments")
       .select("patient_id")
       .eq("doctor_id", doctorProfileId)
@@ -44,7 +45,7 @@ export async function GET(request: NextRequest) {
     const patientIds = assignments?.map((a: any) => a.patient_id) || [];
 
     // Dev fallback: if no assignments, return all reports in DB
-    let query = supabaseServer
+    let query = supabase
       .from("medical_results")
       .select(`
         id,
@@ -83,7 +84,7 @@ export async function PUT(request: NextRequest) {
 
     if (!reportId) return NextResponse.json({ error: "reportId required" }, { status: 400 });
 
-    const { data, error } = await supabaseServer
+    const { data, error } = await supabase
       .from("medical_results")
       .update({ interpretation: interpretation ?? undefined })
       .eq("id", reportId)

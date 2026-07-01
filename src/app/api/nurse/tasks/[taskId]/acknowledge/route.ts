@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { supabaseServer } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/server";
 
 export async function PUT(
   request: NextRequest,
@@ -12,13 +12,14 @@ export async function PUT(
 
     // Get authentication token
     const token = request.cookies.get("sb-auth-token")?.value;
+    const supabase = await createClient();
     const isDevMode = process.env.NODE_ENV === "development";
 
     let nurseProfileId: string;
 
     if (token) {
       // Real authentication - get nurse from token
-      const { data: authData } = await supabaseServer.auth.getUser(token);
+      const { data: authData, error: authError } = await supabase.auth.getUser();
 
       if (!authData?.user?.id) {
         return NextResponse.json(
@@ -28,7 +29,7 @@ export async function PUT(
       }
 
       // Get nurse profile
-      const { data: profile, error: profileError } = await supabaseServer
+      const { data: profile, error: profileError } = await supabase
         .from("user_profiles")
         .select("id")
         .eq("auth_id", authData.user.id)
@@ -45,7 +46,7 @@ export async function PUT(
       nurseProfileId = profile.id;
     } else if (isDevMode) {
       // Development mode - use first nurse from database
-      const { data: profile, error: profileError } = await supabaseServer
+      const { data: profile, error: profileError } = await supabase
         .from("user_profiles")
         .select("id")
         .eq("role", "NURSE")
@@ -69,7 +70,7 @@ export async function PUT(
     }
 
     // Update task to mark as acknowledged
-    const { data: updatedTask, error: updateError } = await supabaseServer
+    const { data: updatedTask, error: updateError } = await supabase
       .from("coordination_tasks")
       .update({
         acknowledged: true,

@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { LogoutButton } from "@/components/auth/LogoutButton";
 import { cn } from "@/lib/utils";
 
 const navItems = [
@@ -56,10 +57,11 @@ export function PatientSidebar() {
         })}
       </nav>
 
-      <div className="mt-auto p-4">
+      <div className="mt-auto p-4 space-y-3">
         <Button className="w-full rounded-full bg-emerald-700 hover:bg-emerald-600 transition-all">
           Book Consultation
         </Button>
+        <LogoutButton />
       </div>
     </aside>
   );

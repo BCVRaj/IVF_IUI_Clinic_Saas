@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseServer } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/server";
 
 const fallbackPatients = [
   {
@@ -40,14 +40,15 @@ const fallbackPatients = [
 export async function GET(request: NextRequest) {
   try {
     const token = request.cookies.get("sb-auth-token")?.value;
+    const supabase = await createClient();
     const isDevMode = process.env.NODE_ENV === "development";
 
     // Dev mode fallback: allow listing patients without auth to unblock UI
     if (!token) {
-      if (!supabaseServer) {
+      if (!supabase) {
         return NextResponse.json({ data: [], success: true, count: 0 });
       }
-      const { data, error } = await supabaseServer
+      const { data, error } = await supabase
         .from("patients")
         .select("id, first_name, last_name, email, phone, date_of_birth, gender, blood_type, onboarding_status")
         .order("created_at", { ascending: false })
@@ -62,12 +63,12 @@ export async function GET(request: NextRequest) {
     }
 
     // Authenticated flow
-    const { data: authData } = await supabaseServer.auth.getUser(token);
+    const { data: authData, error: authError } = await supabase.auth.getUser();
     if (!authData.user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { data: profile } = await supabaseServer
+    const { data: profile } = await supabase
       .from("user_profiles")
       .select("*")
       .eq("auth_id", authData.user.id)
@@ -83,7 +84,7 @@ export async function GET(request: NextRequest) {
 
     // If a doctor profile exists, fetch via assignments
     if (profile?.role === "DOCTOR") {
-      const { data: patients, error } = await supabaseServer
+      const { data: patients, error } = await supabase
         .from("doctor_patient_assignments")
         .select(`
           patient_id,
@@ -111,7 +112,7 @@ export async function GET(request: NextRequest) {
       // In dev mode, if no assigned patients found, fall back to ALL patients so
       // newly onboarded patients are always visible regardless of assignment state
       if (isDevMode && formattedPatients.length === 0) {
-        const { data: allPatients } = await supabaseServer
+        const { data: allPatients } = await supabase
           .from("patients")
           .select("id, first_name, last_name, email, phone, date_of_birth, gender, blood_type, onboarding_status")
           .order("created_at", { ascending: false })
@@ -131,7 +132,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Dev mode fallback: no doctor profile for this token — return all patients
-    const { data: allPatients, error: allError } = await supabaseServer
+    const { data: allPatients, error: allError } = await supabase
       .from("patients")
       .select("id, first_name, last_name, email, phone, date_of_birth, gender, blood_type, onboarding_status")
       .order("created_at", { ascending: false })

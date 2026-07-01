@@ -1,27 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseServer } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/server";
 
 export async function POST(request: NextRequest) {
   try {
-    const token = request.cookies.get("sb-auth-token")?.value;
+    const supabase = await createClient();
 
-    if (!token) {
-      // Clear cookie anyway
-      const response = NextResponse.json({ success: true });
-      response.cookies.delete("sb-auth-token");
-      return response;
-    }
-
-    // Sign out from Supabase
-    const { error } = await supabaseServer.auth.signOut();
+    // Sign out from Supabase using cookie-aware client
+    const { error } = await supabase.auth.signOut();
 
     if (error) {
       console.error("Logout error:", error);
     }
 
-    // Clear auth cookie
+    // Clear auth cookies
     const response = NextResponse.json({ success: true });
     response.cookies.delete("sb-auth-token");
+    response.cookies.delete("sb-user-role");
     return response;
   } catch (error: any) {
     return NextResponse.json(

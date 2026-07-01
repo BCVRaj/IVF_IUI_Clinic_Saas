@@ -1,4 +1,7 @@
+"use client"
+
 import { Bell, CalendarDays, Search } from "lucide-react";
+import { LogoutButton } from "@/components/auth/LogoutButton";
 
 export function NurseTopbar() {
   return (
@@ -36,6 +39,10 @@ export function NurseTopbar() {
           <p className="text-[10px] uppercase tracking-widest text-slate-500">
             Operational Staff
           </p>
+        </div>
+
+        <div className="hidden sm:block">
+          <LogoutButton />
         </div>
       </div>
     </header>

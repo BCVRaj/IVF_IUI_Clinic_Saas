@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseServer } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/server";
 
 type BasicProfile = { id: string; role?: string | null; first_name?: string | null; last_name?: string | null; auth_id?: string | null };
 
 // In dev mode, seed a demo nurse via auth.admin if none exist in user_profiles
 async function getOrCreateDemoNurse(): Promise<BasicProfile | null> {
   // Check if any nurse already exists
-  const { data: existing } = await supabaseServer
+  const { data: existing } = await supabase
     .from("user_profiles")
     .select("*")
     .eq("role", "NURSE")
@@ -19,7 +19,7 @@ async function getOrCreateDemoNurse(): Promise<BasicProfile | null> {
   let nurseAuthId: string | null = null;
 
   // Try to create a new auth user
-  const { data: newAuth, error: authErr } = await supabaseServer.auth.admin.createUser({
+  const { data: newAuth, error: authErr } = await supabase.auth.admin.createUser({
     email: demoEmail,
     email_confirm: true,
     user_metadata: { first_name: "Demo", last_name: "Nurse" },
@@ -27,7 +27,7 @@ async function getOrCreateDemoNurse(): Promise<BasicProfile | null> {
 
   if (authErr) {
     // If the user already exists in auth but profile is missing, list users to get the id
-    const { data: list } = await supabaseServer.auth.admin.listUsers();
+    const { data: list } = await supabase.auth.admin.listUsers();
     const found = list?.users?.find((u: any) => u.email === demoEmail);
     nurseAuthId = found?.id ?? null;
   } else {
@@ -37,7 +37,7 @@ async function getOrCreateDemoNurse(): Promise<BasicProfile | null> {
   if (!nurseAuthId) return null;
 
   // Upsert the user_profile
-  const { data: profile } = await supabaseServer
+  const { data: profile } = await supabase
     .from("user_profiles")
     .upsert(
       { auth_id: nurseAuthId, first_name: "Demo", last_name: "Nurse", role: "NURSE" },
@@ -80,6 +80,7 @@ const fallbackDoctorProfile: BasicProfile = {
 export async function POST(request: NextRequest) {
   try {
     const token = request.cookies.get("sb-auth-token")?.value;
+    const supabase = await createClient();
     const isDevMode = process.env.NODE_ENV === "development";
 
     const {
@@ -102,12 +103,12 @@ export async function POST(request: NextRequest) {
     let doctorProfile: BasicProfile | null = null;
 
     if (token) {
-      const { data: authData } = await supabaseServer.auth.getUser(token);
+      const { data: authData, error: authError } = await supabase.auth.getUser();
       if (!authData.user) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
       }
 
-      const { data: profile } = await supabaseServer
+      const { data: profile } = await supabase
         .from("user_profiles")
         .select("*")
         .eq("auth_id", authData.user.id)
@@ -122,7 +123,7 @@ export async function POST(request: NextRequest) {
 
       doctorProfile = profile;
     } else if (isDevMode) {
-      const { data: profile } = await supabaseServer
+      const { data: profile } = await supabase
         .from("user_profiles")
         .select("*")
         .eq("role", "DOCTOR")
@@ -142,7 +143,7 @@ export async function POST(request: NextRequest) {
 
     // Look up nurse profile — in dev mode, fall back to any available nurse if ID not found
     let nurseProfile: BasicProfile | null = null;
-    const { data: nurseByIdData, error: nurseByIdError } = await supabaseServer
+    const { data: nurseByIdData, error: nurseByIdError } = await supabase
       .from("user_profiles")
       .select("*")
       .eq("id", assignedToNurseId)
@@ -169,7 +170,7 @@ export async function POST(request: NextRequest) {
     // Use the resolved nurse ID (may differ from assignedToNurseId in dev fallback)
     const resolvedNurseId = nurseProfile.id;
 
-    const { data: patient } = await supabaseServer
+    const { data: patient } = await supabase
       .from("patients")
       .select("*")
       .eq("id", patientId)
@@ -182,7 +183,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { data: task, error } = await supabaseServer
+    const { data: task, error } = await supabase
       .from("coordination_tasks")
       .insert({
         patient_id: patientId,
@@ -206,7 +207,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    await supabaseServer.from("alerts").insert({
+    await supabase.from("alerts").insert({
       patient_id: patientId,
       alert_type: "NEW_TASK_ASSIGNED",
       message: `New task assigned: ${title}`,
@@ -216,7 +217,7 @@ export async function POST(request: NextRequest) {
       visible_to_patient: false,
     });
 
-    await supabaseServer.from("audit_log").insert({
+    await supabase.from("audit_log").insert({
       user_id: doctorProfile.id,
       action: "CREATE_COORDINATION_TASK",
       table_name: "coordination_tasks",
@@ -244,17 +245,18 @@ export async function POST(request: NextRequest) {
 export async function GET(request: NextRequest) {
   try {
     const token = request.cookies.get("sb-auth-token")?.value;
+    const supabase = await createClient();
     const isDevMode = process.env.NODE_ENV === "development";
 
     let doctorProfile: BasicProfile | null = null;
 
     if (token) {
-      const { data: authData } = await supabaseServer.auth.getUser(token);
+      const { data: authData, error: authError } = await supabase.auth.getUser();
       if (!authData.user) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
       }
 
-      const { data: profile } = await supabaseServer
+      const { data: profile } = await supabase
         .from("user_profiles")
         .select("*")
         .eq("auth_id", authData.user.id)
@@ -269,7 +271,7 @@ export async function GET(request: NextRequest) {
 
       doctorProfile = profile;
     } else if (isDevMode) {
-      const { data: profile } = await supabaseServer
+      const { data: profile } = await supabase
         .from("user_profiles")
         .select("*")
         .eq("role", "DOCTOR")
@@ -285,7 +287,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    if (!doctorProfile) return NextResponse.json({ error: "Unauthorized" }, { status: 401 }); const { data: tasks, error } = await supabaseServer
+    if (!doctorProfile) return NextResponse.json({ error: "Unauthorized" }, { status: 401 }); const { data: tasks, error } = await supabase
       .from("coordination_tasks")
       .select(`
         id,

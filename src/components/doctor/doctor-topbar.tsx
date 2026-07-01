@@ -1,7 +1,10 @@
 "use client";
 
+"use client"
+
 import { Bell, CalendarDays, Search, Siren } from "lucide-react";
 
+import { LogoutButton } from "@/components/auth/LogoutButton";
 import { StatusBadge } from "@/components/patient/status-badge";
 
 export function DoctorTopbar() {
@@ -38,6 +41,9 @@ export function DoctorTopbar() {
         <div className="text-right">
           <p className="text-sm font-bold text-slate-900">Lead Physician</p>
           <p className="text-[10px] uppercase tracking-widest text-slate-500">Clinic Director</p>
+        </div>
+        <div className="hidden sm:block">
+          <LogoutButton />
         </div>
       </div>
     </header>

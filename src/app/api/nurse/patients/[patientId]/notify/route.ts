@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseServer } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/server";
 
 export async function POST(
   request: NextRequest,
@@ -7,6 +7,7 @@ export async function POST(
 ) {
   try {
     const token = request.cookies.get("sb-auth-token")?.value;
+    const supabase = await createClient();
     const isDevMode = process.env.NODE_ENV === "development";
 
     const { patientId } = await params;
@@ -15,18 +16,18 @@ export async function POST(
     let nurseProfile: { id: string; role: string } | null = null;
 
     if (token) {
-      const { data: authData } = await supabaseServer.auth.getUser(token);
+      const { data: authData, error: authError } = await supabase.auth.getUser();
       if (!authData.user) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
       }
-      const { data: profile } = await supabaseServer
+      const { data: profile } = await supabase
         .from("user_profiles")
         .select("*")
         .eq("auth_id", authData.user.id)
         .single();
       nurseProfile = profile;
     } else if (isDevMode) {
-      const { data: profile } = await supabaseServer
+      const { data: profile } = await supabase
         .from("user_profiles")
         .select("*")
         .eq("role", "NURSE")
@@ -45,7 +46,7 @@ export async function POST(
     }
 
     // Insert an alert for the patient
-    const { error: alertError } = await supabaseServer
+    const { error: alertError } = await supabase
       .from("alerts")
       .insert({
         patient_id: patientId,
@@ -60,7 +61,7 @@ export async function POST(
     if (alertError) throw alertError;
 
     // Log the audit event
-    await supabaseServer.from("audit_log").insert({
+    await supabase.from("audit_log").insert({
       user_id: nurseProfile.id,
       action: "NURSE_SENT_PATIENT_ALARM",
       table_name: "alerts",

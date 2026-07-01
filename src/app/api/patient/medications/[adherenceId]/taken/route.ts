@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseServer } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/server";
 
 export async function PUT(
   request: NextRequest,
@@ -7,6 +7,7 @@ export async function PUT(
 ) {
   try {
     const token = request.cookies.get("sb-auth-token")?.value;
+    const supabase = await createClient();
     if (!token) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -14,12 +15,12 @@ export async function PUT(
     const { adherenceId } = await params;
     const { notes } = await request.json();
 
-    const { data: authData } = await supabaseServer.auth.getUser(token);
+    const { data: authData, error: authError } = await supabase.auth.getUser();
     if (!authData.user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { data: profile } = await supabaseServer
+    const { data: profile } = await supabase
       .from("user_profiles")
       .select("*")
       .eq("auth_id", authData.user.id)
@@ -30,14 +31,14 @@ export async function PUT(
     }
 
     // Get adherence record
-    const { data: adherence } = await supabaseServer
+    const { data: adherence } = await supabase
       .from("medication_adherence")
       .select("patient_id")
       .eq("id", adherenceId)
       .single();
 
     // Verify patient owns this adherence record
-    const { data: patient } = await supabaseServer
+    const { data: patient } = await supabase
       .from("patients")
       .select("id")
       .eq("user_profile_id", profile.id)
@@ -47,7 +48,7 @@ export async function PUT(
       return NextResponse.json({ error: "Access denied" }, { status: 403 });
     }
 
-    const { data: updated, error } = await supabaseServer
+    const { data: updated, error } = await supabase
       .from("medication_adherence")
       .update({
         status: "TAKEN",

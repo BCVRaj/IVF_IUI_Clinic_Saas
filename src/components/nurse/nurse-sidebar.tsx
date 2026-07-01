@@ -10,6 +10,7 @@ import {
   UserPlus,
 } from "lucide-react";
 
+import { LogoutButton } from "@/components/auth/LogoutButton";
 import { cn } from "@/lib/utils";
 
 const navItems = [
@@ -52,6 +53,9 @@ export function NurseSidebar() {
           );
         })}
       </nav>
+      <div className="mt-auto px-6 pb-8">
+        <LogoutButton />
+      </div>
     </aside>
   );
 }

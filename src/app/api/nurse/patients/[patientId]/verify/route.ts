@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseServer } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/server";
 
 export async function PUT(
   request: NextRequest,
@@ -7,6 +7,7 @@ export async function PUT(
 ) {
   try {
     const token = request.cookies.get("sb-auth-token")?.value;
+    const supabase = await createClient();
     const isDevMode = process.env.NODE_ENV === "development";
 
     const { nartsrId, approveKyc } = await request.json();
@@ -15,18 +16,18 @@ export async function PUT(
     let nurseProfile: { id: string; role: string } | null = null;
 
     if (token) {
-      const { data: authData } = await supabaseServer.auth.getUser(token);
+      const { data: authData, error: authError } = await supabase.auth.getUser();
       if (!authData.user) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
       }
-      const { data: profile } = await supabaseServer
+      const { data: profile } = await supabase
         .from("user_profiles")
         .select("*")
         .eq("auth_id", authData.user.id)
         .single();
       nurseProfile = profile;
     } else if (isDevMode) {
-      const { data: profile } = await supabaseServer
+      const { data: profile } = await supabase
         .from("user_profiles")
         .select("*")
         .eq("role", "NURSE")
@@ -48,7 +49,7 @@ export async function PUT(
     let newStatus = "PENDING_VERIFICATION";
     if (approveKyc) {
       newStatus = "CLEARED";
-      const { error: patientErr } = await supabaseServer
+      const { error: patientErr } = await supabase
         .from("patients")
         .update({
           onboarding_status: "CLEARED",
@@ -60,7 +61,7 @@ export async function PUT(
 
       // Update KYC documents status
       try {
-        await supabaseServer
+        await supabase
           .from("kyc_documents")
           .update({
             status: "VERIFIED",
@@ -76,25 +77,25 @@ export async function PUT(
     // Process NARTSR ID
     if (nartsrId) {
       // First update the `patients` table convenience field
-      await supabaseServer
+      await supabase
         .from("patients")
         .update({ nartsr_id: nartsrId })
         .eq("id", patientId);
 
       // Then upsert the strict regulatory table
-      const { data: existingRecord } = await supabaseServer
+      const { data: existingRecord } = await supabase
         .from("nartsr_records")
         .select("id")
         .eq("patient_id", patientId)
         .single();
 
       if (existingRecord) {
-        await supabaseServer
+        await supabase
           .from("nartsr_records")
           .update({ registry_id: nartsrId })
           .eq("id", existingRecord.id);
       } else {
-        await supabaseServer
+        await supabase
           .from("nartsr_records")
           .insert({
             patient_id: patientId,
@@ -104,7 +105,7 @@ export async function PUT(
     }
 
     // Log the audit event
-    await supabaseServer.from("audit_log").insert({
+    await supabase.from("audit_log").insert({
       user_id: nurseProfile.id,
       action: "NURSE_VERIFY_KYC_NARTSR",
       table_name: "patients",

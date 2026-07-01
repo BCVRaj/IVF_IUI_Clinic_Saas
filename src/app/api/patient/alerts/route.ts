@@ -1,19 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseServer } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/server";
 
 export async function GET(request: NextRequest) {
   try {
     const token = request.cookies.get("sb-auth-token")?.value;
+    const supabase = await createClient();
     const isDevMode = process.env.NODE_ENV === "development";
 
     let patientProfileId: string | null = null;
     let authUserId: string | null = null;
 
     if (token) {
-      const { data: authData } = await supabaseServer.auth.getUser(token);
+      const { data: authData, error: authError } = await supabase.auth.getUser();
       if (authData?.user) {
         authUserId = authData.user.id;
-        const { data: profile } = await supabaseServer
+        const { data: profile } = await supabase
           .from("user_profiles")
           .select("id")
           .eq("auth_id", authData.user.id)
@@ -22,7 +23,7 @@ export async function GET(request: NextRequest) {
         patientProfileId = profile?.id ?? null;
       }
     } else if (isDevMode) {
-      const { data: profile } = await supabaseServer
+      const { data: profile } = await supabase
         .from("user_profiles")
         .select("id, auth_id")
         .eq("role", "PATIENT")
@@ -37,7 +38,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Get the patient record ID
-    const { data: patient } = await supabaseServer
+    const { data: patient } = await supabase
       .from("patients")
       .select("id")
       .eq("user_profile_id", patientProfileId)
@@ -48,7 +49,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Fetch alerts visible to patient
-    const { data: alerts, error } = await supabaseServer
+    const { data: alerts, error } = await supabase
       .from("alerts")
       .select("*")
       .eq("patient_id", patient.id)

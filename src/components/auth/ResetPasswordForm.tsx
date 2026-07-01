@@ -1,0 +1,178 @@
+'use client'
+
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
+
+export default function ResetPasswordForm() {
+  const router = useRouter()
+
+  const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [isLoading, setIsLoading] = useState(false)
+  const [errors, setErrors] = useState<{ password?: string; confirmPassword?: string; general?: string }>({})
+  const [isSuccess, setIsSuccess] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+
+  const validate = (): boolean => {
+    const newErrors: typeof errors = {}
+
+    if (!password) {
+      newErrors.password = 'Password is required'
+    } else if (password.length < 6) {
+      newErrors.password = 'Password must be at least 6 characters'
+    }
+
+    if (!confirmPassword) {
+      newErrors.confirmPassword = 'Please confirm your password'
+    } else if (password !== confirmPassword) {
+      newErrors.confirmPassword = 'Passwords do not match'
+    }
+
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!validate()) return
+
+    setIsLoading(true)
+    setErrors({})
+
+    try {
+      const supabase = createClient()
+      const { error } = await supabase.auth.updateUser({
+        password,
+      })
+
+      if (error) {
+        setErrors({ general: error.message })
+        setIsLoading(false)
+        return
+      }
+
+      setIsSuccess(true)
+      setTimeout(() => {
+        router.push('/login')
+      }, 2500)
+    } catch {
+      setErrors({ general: 'An unexpected error occurred. Please try again.' })
+      setIsLoading(false)
+    }
+  }
+
+  if (isSuccess) {
+    return (
+      <div className="w-full max-w-sm mx-auto text-center">
+        <div className="w-14 h-14 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-5">
+          <svg className="w-7 h-7 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
+          </svg>
+        </div>
+        <h2 className="text-xl font-bold text-[#0F172A] mb-2">Password Updated</h2>
+        <p className="text-sm text-gray-500">
+          Your password has been successfully reset. Redirecting to sign in...
+        </p>
+        <div className="mt-4">
+          <svg className="animate-spin h-5 w-5 text-[#27257E] mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+          </svg>
+        </div>
+      </div>
+    )
+  }
+
+  const EyeIcon = ({ show, onClick }: { show: boolean; onClick: () => void }) => (
+    <button
+      type="button"
+      onClick={onClick}
+      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+      tabIndex={-1}
+    >
+      {show ? (
+        <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88" />
+        </svg>
+      ) : (
+        <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+          <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+        </svg>
+      )}
+    </button>
+  )
+
+  return (
+    <div className="w-full max-w-sm mx-auto">
+      <div className="mb-8">
+        <h1 className="text-2xl font-bold text-[#0F172A] mb-1">Reset Password</h1>
+        <p className="text-sm text-gray-500">Enter your new password below</p>
+      </div>
+
+      {errors.general && (
+        <div className="mb-5 p-3 rounded-lg bg-red-50 border border-red-200">
+          <p className="text-sm text-red-700">{errors.general}</p>
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+        <div>
+          <label htmlFor="password" className="block text-sm font-medium text-[#0F172A] mb-1.5">
+            New Password
+          </label>
+          <div className="relative">
+            <input
+              id="password"
+              type={showPassword ? 'text' : 'password'}
+              value={password}
+              onChange={(e) => { setPassword(e.target.value); setErrors(prev => ({ ...prev, password: undefined })) }}
+              placeholder="Minimum 6 characters"
+              autoComplete="new-password"
+              className={`w-full px-3.5 py-2.5 pr-10 rounded-lg border text-sm text-[#0F172A] placeholder-gray-400 bg-white transition-colors duration-200 outline-none focus:ring-2 focus:ring-[#27257E]/20 focus:border-[#27257E] ${errors.password ? 'border-red-400 focus:ring-red-200 focus:border-red-400' : 'border-[#E5E7EB]'}`}
+            />
+            <EyeIcon show={showPassword} onClick={() => setShowPassword(!showPassword)} />
+          </div>
+          {errors.password && <p className="mt-1 text-xs text-red-600">{errors.password}</p>}
+        </div>
+
+        <div>
+          <label htmlFor="confirmPassword" className="block text-sm font-medium text-[#0F172A] mb-1.5">
+            Confirm Password
+          </label>
+          <div className="relative">
+            <input
+              id="confirmPassword"
+              type={showConfirmPassword ? 'text' : 'password'}
+              value={confirmPassword}
+              onChange={(e) => { setConfirmPassword(e.target.value); setErrors(prev => ({ ...prev, confirmPassword: undefined })) }}
+              placeholder="Re-enter your password"
+              autoComplete="new-password"
+              className={`w-full px-3.5 py-2.5 pr-10 rounded-lg border text-sm text-[#0F172A] placeholder-gray-400 bg-white transition-colors duration-200 outline-none focus:ring-2 focus:ring-[#27257E]/20 focus:border-[#27257E] ${errors.confirmPassword ? 'border-red-400 focus:ring-red-200 focus:border-red-400' : 'border-[#E5E7EB]'}`}
+            />
+            <EyeIcon show={showConfirmPassword} onClick={() => setShowConfirmPassword(!showConfirmPassword)} />
+          </div>
+          {errors.confirmPassword && <p className="mt-1 text-xs text-red-600">{errors.confirmPassword}</p>}
+        </div>
+
+        <button
+          type="submit"
+          disabled={isLoading}
+          className="w-full py-2.5 px-4 rounded-lg bg-[#27257E] text-white font-medium text-sm transition-all duration-200 hover:bg-[#1e1c63] focus:outline-none focus:ring-2 focus:ring-[#27257E]/50 focus:ring-offset-2 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+        >
+          {isLoading ? (
+            <>
+              <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+              </svg>
+              Updating...
+            </>
+          ) : 'Reset Password'}
+        </button>
+      </form>
+    </div>
+  )
+}

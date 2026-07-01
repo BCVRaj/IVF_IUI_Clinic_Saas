@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseServer } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/server";
 
 export async function POST(request: NextRequest) {
   try {
     const token = request.cookies.get("sb-auth-token")?.value;
+    const supabase = await createClient();
 
     if (!token) {
       return NextResponse.json(
@@ -54,13 +55,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Get current user
-    const { data: authData } = await supabaseServer.auth.getUser(token);
+    const { data: authData, error: authError } = await supabase.auth.getUser();
     if (!authData.user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     // Check if user is doctor
-    const { data: profile } = await supabaseServer
+    const { data: profile } = await supabase
       .from("user_profiles")
       .select("*")
       .eq("auth_id", authData.user.id)
@@ -74,7 +75,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create new patient
-    const { data: patient, error: patientError } = await supabaseServer
+    const { data: patient, error: patientError } = await supabase
       .from("patients")
       .insert({
         first_name: firstName,
@@ -102,7 +103,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Assign patient to doctor
-    const { error: assignError } = await supabaseServer
+    const { error: assignError } = await supabase
       .from("doctor_patient_assignments")
       .insert({
         doctor_id: profile.id,
@@ -111,7 +112,7 @@ export async function POST(request: NextRequest) {
 
     if (assignError) {
       // Delete patient if assignment fails
-      await supabaseServer.from("patients").delete().eq("id", patient.id);
+      await supabase.from("patients").delete().eq("id", patient.id);
       return NextResponse.json(
         { error: "Failed to assign patient to doctor" },
         { status: 500 }
@@ -119,7 +120,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Log in audit
-    await supabaseServer.from("audit_log").insert({
+    await supabase.from("audit_log").insert({
       user_id: profile.id,
       action: "CREATE_PATIENT",
       table_name: "patients",

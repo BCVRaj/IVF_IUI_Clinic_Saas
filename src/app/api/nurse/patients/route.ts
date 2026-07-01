@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseServer } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/server";
 
 // Helper: find or create a demo doctor so patient assignments always work in dev mode
 async function getOrCreateDemoDoctor(): Promise<string | null> {
-  const { data: existing } = await supabaseServer
+  const { data: existing } = await supabase
     .from("user_profiles")
     .select("id")
     .eq("role", "DOCTOR")
@@ -14,14 +14,14 @@ async function getOrCreateDemoDoctor(): Promise<string | null> {
   const demoEmail = "demo.doctor@clinic.internal";
   let doctorAuthId: string | null = null;
 
-  const { data: newAuth, error: authErr } = await supabaseServer.auth.admin.createUser({
+  const { data: newAuth, error: authErr } = await supabase.auth.admin.createUser({
     email: demoEmail,
     email_confirm: true,
     user_metadata: { first_name: "Demo", last_name: "Doctor" },
   });
 
   if (authErr) {
-    const { data: list } = await supabaseServer.auth.admin.listUsers();
+    const { data: list } = await supabase.auth.admin.listUsers();
     const found = list?.users?.find((u: any) => u.email === demoEmail);
     doctorAuthId = found?.id ?? null;
   } else {
@@ -30,7 +30,7 @@ async function getOrCreateDemoDoctor(): Promise<string | null> {
 
   if (!doctorAuthId) return null;
 
-  const { data: profile } = await supabaseServer
+  const { data: profile } = await supabase
     .from("user_profiles")
     .upsert(
       { auth_id: doctorAuthId, first_name: "Demo", last_name: "Doctor", role: "DOCTOR" },
@@ -50,7 +50,7 @@ async function ensureAuthProfile(
   role: "PATIENT" | "NURSE" | "DOCTOR"
 ): Promise<{ profileId: string; authUserId: string } | null> {
   // Create the auth user (service role required)
-  const { data: authData, error: authError } = await supabaseServer.auth.admin.createUser({
+  const { data: authData, error: authError } = await supabase.auth.admin.createUser({
     email,
     email_confirm: true,
     user_metadata: { first_name: firstName, last_name: lastName },
@@ -62,7 +62,7 @@ async function ensureAuthProfile(
   }
 
   // Create user_profile linked to the auth user
-  const { data: profile, error: profileError } = await supabaseServer
+  const { data: profile, error: profileError } = await supabase
     .from("user_profiles")
     .insert({
       auth_id: authData.user.id,
@@ -76,7 +76,7 @@ async function ensureAuthProfile(
   if (profileError || !profile) {
     console.error("user_profiles insert failed:", profileError?.message);
     // Clean up the auth user we just created
-    await supabaseServer.auth.admin.deleteUser(authData.user.id);
+    await supabase.auth.admin.deleteUser(authData.user.id);
     return null;
   }
 
@@ -86,6 +86,7 @@ async function ensureAuthProfile(
 export async function POST(request: NextRequest) {
   try {
     const token = request.cookies.get("sb-auth-token")?.value;
+    const supabase = await createClient();
     const isDevMode = process.env.NODE_ENV === "development";
 
     const {
@@ -155,9 +156,9 @@ export async function POST(request: NextRequest) {
     let nurseProfileId: string | null = null;
 
     if (token) {
-      const { data: authData } = await supabaseServer.auth.getUser(token);
+      const { data: authData, error: authError } = await supabase.auth.getUser();
       if (authData?.user) {
-        const { data: profile } = await supabaseServer
+        const { data: profile } = await supabase
           .from("user_profiles")
           .select("id")
           .eq("auth_id", authData.user.id)
@@ -166,7 +167,7 @@ export async function POST(request: NextRequest) {
         nurseProfileId = profile?.id ?? null;
       }
     } else if (isDevMode) {
-      const { data: profile } = await supabaseServer
+      const { data: profile } = await supabase
         .from("user_profiles")
         .select("id")
         .eq("role", "NURSE")
@@ -195,7 +196,7 @@ export async function POST(request: NextRequest) {
     }
 
     // --- Step 2: Create the patients record linked to the profile ---
-    const { data: patient, error: patientError } = await supabaseServer
+    const { data: patient, error: patientError } = await supabase
       .from("patients")
       .insert({
         user_profile_id: created.profileId,
@@ -235,14 +236,14 @@ export async function POST(request: NextRequest) {
     if (patientError) {
       console.error("Patient creation error:", patientError);
       // Clean up the auth user since the patient insert failed
-      await supabaseServer.auth.admin.deleteUser(created.authUserId);
+      await supabase.auth.admin.deleteUser(created.authUserId);
       return NextResponse.json({ error: patientError.message }, { status: 400 });
     }
 
     // --- Step 3: Assign patient to a doctor (seed demo doctor if none exist) ---
     const doctorId = await getOrCreateDemoDoctor();
     if (doctorId) {
-      await supabaseServer.from("doctor_patient_assignments").insert({
+      await supabase.from("doctor_patient_assignments").insert({
         doctor_id: doctorId,
         patient_id: patient.id,
         status: "ACTIVE",
@@ -251,7 +252,7 @@ export async function POST(request: NextRequest) {
 
     // --- Step 4: Assign to nurse ---
     if (nurseProfileId) {
-      await supabaseServer.from("nurse_patient_assignments").insert({
+      await supabase.from("nurse_patient_assignments").insert({
         nurse_id: nurseProfileId,
         patient_id: patient.id,
         status: "ACTIVE",
@@ -260,7 +261,7 @@ export async function POST(request: NextRequest) {
 
     // --- Step 5: Audit log ---
     if (nurseProfileId) {
-      await supabaseServer.from("audit_log").insert({
+      await supabase.from("audit_log").insert({
         user_id: nurseProfileId,
         action: "NURSE_ONBOARD_PATIENT",
         table_name: "patients",
@@ -289,14 +290,15 @@ export async function POST(request: NextRequest) {
 export async function GET(request: NextRequest) {
   try {
     const token = request.cookies.get("sb-auth-token")?.value;
+    const supabase = await createClient();
     const isDevMode = process.env.NODE_ENV === "development";
     
     let nurseProfileId: string | null = null;
 
     if (token) {
-      const { data: authData } = await supabaseServer.auth.getUser(token);
+      const { data: authData, error: authError } = await supabase.auth.getUser();
       if (authData?.user) {
-        const { data: profile } = await supabaseServer
+        const { data: profile } = await supabase
           .from("user_profiles")
           .select("id")
           .eq("auth_id", authData.user.id)
@@ -305,7 +307,7 @@ export async function GET(request: NextRequest) {
         nurseProfileId = profile?.id ?? null;
       }
     } else if (isDevMode) {
-      const { data: profile } = await supabaseServer
+      const { data: profile } = await supabase
         .from("user_profiles")
         .select("id")
         .eq("role", "NURSE")
@@ -320,7 +322,7 @@ export async function GET(request: NextRequest) {
 
     // For simplicity, return all patients assigned to this nurse, or just all patients
     // since the nurse needs to see the queue. Let's return all patients for the clinic.
-    const { data: patients, error } = await supabaseServer
+    const { data: patients, error } = await supabase
       .from("patients")
       .select("id, first_name, last_name, onboarding_status, nartsr_id, marriage_cert_verified");
 

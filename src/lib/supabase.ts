@@ -109,6 +109,19 @@ export const supabaseServer = new Proxy({} as SupabaseClient, {
 export type Database = {
   public: {
     Tables: {
+      profiles: {
+        Row: {
+          id: string;
+          email: string;
+          role: "doctor" | "patient" | "nurse" | "DOCTOR" | "PATIENT" | "NURSE";
+          created_at: string;
+        };
+        Insert: Omit<
+          Database["public"]["Tables"]["profiles"]["Row"],
+          "id" | "created_at"
+        >;
+        Update: Partial<Database["public"]["Tables"]["profiles"]["Row"]>;
+      };
       user_profiles: {
         Row: {
           id: string;

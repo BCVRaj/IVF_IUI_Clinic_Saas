@@ -1,14 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseServer } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/server";
 
 async function resolveNurseId(request: NextRequest): Promise<string | null> {
   const token = request.cookies.get("sb-auth-token")?.value;
+    const supabase = await createClient();
   const isDevMode = process.env.NODE_ENV === "development";
 
   if (token) {
-    const { data: authData } = await supabaseServer.auth.getUser(token);
+    const { data: authData, error: authError } = await supabase.auth.getUser();
     if (authData?.user) {
-      const { data: profile } = await supabaseServer
+      const { data: profile } = await supabase
         .from("user_profiles")
         .select("id")
         .eq("auth_id", authData.user.id)
@@ -18,7 +19,7 @@ async function resolveNurseId(request: NextRequest): Promise<string | null> {
     }
   }
   if (isDevMode) {
-    const { data: profile } = await supabaseServer
+    const { data: profile } = await supabase
       .from("user_profiles")
       .select("id")
       .eq("role", "NURSE")
@@ -35,7 +36,7 @@ export async function GET(request: NextRequest) {
     const nurseId = await resolveNurseId(request);
     if (!nurseId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const { data: assignments } = await supabaseServer
+    const { data: assignments } = await supabase
       .from("nurse_patient_assignments")
       .select("patient_id")
       .eq("nurse_id", nurseId)
@@ -44,7 +45,7 @@ export async function GET(request: NextRequest) {
     const patientIds = assignments?.map((a: any) => a.patient_id) || [];
     if (patientIds.length === 0) return NextResponse.json({ data: [] });
 
-    const { data, error } = await supabaseServer
+    const { data, error } = await supabase
       .from("medical_results")
       .select(`
         id,
@@ -87,7 +88,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Find the doctor assigned to this patient
-    const { data: assignment } = await supabaseServer
+    const { data: assignment } = await supabase
       .from("doctor_patient_assignments")
       .select("doctor_id")
       .eq("patient_id", patientId)
@@ -98,7 +99,7 @@ export async function POST(request: NextRequest) {
     // Fallback: use any doctor in the system
     let doctorId = assignment?.doctor_id ?? null;
     if (!doctorId) {
-      const { data: anyDoctor } = await supabaseServer
+      const { data: anyDoctor } = await supabase
         .from("user_profiles")
         .select("id")
         .eq("role", "DOCTOR")
@@ -111,7 +112,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "No doctor found to assign the report" }, { status: 400 });
     }
 
-    const { data, error } = await supabaseServer
+    const { data, error } = await supabase
       .from("medical_results")
       .insert({
         patient_id: patientId,

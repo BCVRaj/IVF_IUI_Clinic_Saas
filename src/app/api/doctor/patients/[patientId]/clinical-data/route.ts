@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseServer } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/server";
 
 export async function POST(
   request: NextRequest,
@@ -7,6 +7,7 @@ export async function POST(
 ) {
   try {
     const token = request.cookies.get("sb-auth-token")?.value;
+    const supabase = await createClient();
     const isDevMode = process.env.NODE_ENV === "development";
     const { patientId } = await params;
 
@@ -19,12 +20,12 @@ export async function POST(
       // Dev mode fallback
       profile = { id: "dev-id", role: "DOCTOR" };
     } else {
-      const { data: authData } = await supabaseServer.auth.getUser(token);
+      const { data: authData, error: authError } = await supabase.auth.getUser();
       if (!authData.user) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
       }
 
-      const { data: p } = await supabaseServer
+      const { data: p } = await supabase
         .from("user_profiles")
         .select("*")
         .eq("auth_id", authData.user.id)
@@ -47,7 +48,7 @@ export async function POST(
     // Verify doctor/nurse is assigned to this patient (skipped in dev mode)
       if (!isDevMode) {
         if (profile.role === "DOCTOR") {
-          const { data: assignment } = await supabaseServer
+          const { data: assignment } = await supabase
             .from("doctor_patient_assignments")
             .select("id")
             .eq("doctor_id", profile.id)
@@ -60,7 +61,7 @@ export async function POST(
             );
           }
         } else if (profile.role === "NURSE") {
-          const { data: assignment } = await supabaseServer
+          const { data: assignment } = await supabase
             .from("nurse_patient_assignments")
             .select("id")
             .eq("nurse_id", profile.id)
@@ -126,7 +127,7 @@ export async function POST(
       }
     }
 
-    const { data: insertedData, error: insertError } = await supabaseServer
+    const { data: insertedData, error: insertError } = await supabase
       .from(type)
       .insert([insertPayload])
       .select()
@@ -155,7 +156,7 @@ export async function POST(
 
     // HIPAA audit log
     try {
-      await supabaseServer.from("audit_log").insert({
+      await supabase.from("audit_log").insert({
         user_id: profile.id === "dev-id" ? null : profile.id,
         action: `CREATE_${type.toUpperCase()}`,
         table_name: type,

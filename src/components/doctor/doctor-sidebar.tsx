@@ -13,6 +13,7 @@ import {
   Snowflake,
 } from "lucide-react";
 
+import { LogoutButton } from "@/components/auth/LogoutButton";
 import { cn } from "@/lib/utils";
 
 const items = [
@@ -60,6 +61,9 @@ export function DoctorSidebar() {
           );
         })}
       </nav>
+      <div className="mt-auto px-6 pb-8">
+        <LogoutButton />
+      </div>
     </aside>
   );
 }

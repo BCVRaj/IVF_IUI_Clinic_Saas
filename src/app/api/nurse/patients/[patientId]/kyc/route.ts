@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseServer } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/server";
 
 const ALLOWED_DOC_TYPES = ["AADHAAR", "PAN", "PASSPORT", "MARRIAGE_CERTIFICATE"] as const;
 type DocType = (typeof ALLOWED_DOC_TYPES)[number];
@@ -15,7 +15,7 @@ export async function GET(
   try {
     const { patientId } = await params;
 
-    const { data, error } = await supabaseServer
+    const { data, error } = await supabase
       .from("kyc_documents")
       .select("id, doc_type, file_url, status, verified_by, verified_at, created_at")
       .eq("patient_id", patientId)
@@ -52,15 +52,16 @@ export async function POST(
 ) {
   try {
     const token = request.cookies.get("sb-auth-token")?.value;
+    const supabase = await createClient();
     const isDevMode = process.env.NODE_ENV === "development";
     const { patientId } = await params;
 
     // Resolve nurse profile
     let nurseProfile: { id: string } | null = null;
     if (token) {
-      const { data: authData } = await supabaseServer.auth.getUser(token);
+      const { data: authData, error: authError } = await supabase.auth.getUser();
       if (authData?.user) {
-        const { data: p } = await supabaseServer
+        const { data: p } = await supabase
           .from("user_profiles")
           .select("id, role")
           .eq("auth_id", authData.user.id)
@@ -68,7 +69,7 @@ export async function POST(
         if (p && (p.role === "NURSE" || p.role === "DOCTOR")) nurseProfile = p;
       }
     } else if (isDevMode) {
-      const { data: p } = await supabaseServer
+      const { data: p } = await supabase
         .from("user_profiles")
         .select("id")
         .eq("role", "NURSE")
@@ -106,7 +107,7 @@ export async function POST(
 
     let fileUrl = `placeholder://${storagePath}`;
 
-    const { data: uploadData, error: uploadError } = await supabaseServer.storage
+    const { data: uploadData, error: uploadError } = await supabase.storage
       .from("kyc-documents")
       .upload(storagePath, fileBuffer, {
         contentType: file.type || "application/octet-stream",
@@ -120,21 +121,21 @@ export async function POST(
       );
       // Non-fatal: we still record the document row with a placeholder
     } else {
-      const { data: urlData } = supabaseServer.storage
+      const { data: urlData } = supabase.storage
         .from("kyc-documents")
         .getPublicUrl(uploadData.path);
       fileUrl = urlData.publicUrl;
     }
 
     // Remove any existing row for same patient + doc type so we don't accumulate duplicates
-    await supabaseServer
+    await supabase
       .from("kyc_documents")
       .delete()
       .eq("patient_id", patientId)
       .eq("doc_type", docType);
 
     // Insert new record
-    const { data: inserted, error: insertError } = await supabaseServer
+    const { data: inserted, error: insertError } = await supabase
       .from("kyc_documents")
       .insert({
         patient_id: patientId,
@@ -151,7 +152,7 @@ export async function POST(
 
     // Audit log
     try {
-      await supabaseServer.from("audit_log").insert({
+      await supabase.from("audit_log").insert({
         user_id: nurseProfile.id === "dev-id" ? null : nurseProfile.id,
         action: "UPLOAD_KYC_DOCUMENT",
         table_name: "kyc_documents",
@@ -178,6 +179,7 @@ export async function PUT(
 ) {
   try {
     const token = request.cookies.get("sb-auth-token")?.value;
+    const supabase = await createClient();
     const isDevMode = process.env.NODE_ENV === "development";
     const { patientId } = await params;
     const { documentId, status } = await request.json();
@@ -191,9 +193,9 @@ export async function PUT(
 
     let verifiedBy: string | null = null;
     if (token) {
-      const { data: authData } = await supabaseServer.auth.getUser(token);
+      const { data: authData, error: authError } = await supabase.auth.getUser();
       if (authData?.user) {
-        const { data: p } = await supabaseServer
+        const { data: p } = await supabase
           .from("user_profiles")
           .select("id")
           .eq("auth_id", authData.user.id)
@@ -202,7 +204,7 @@ export async function PUT(
       }
     }
 
-    const { data, error } = await supabaseServer
+    const { data, error } = await supabase
       .from("kyc_documents")
       .update({
         status,

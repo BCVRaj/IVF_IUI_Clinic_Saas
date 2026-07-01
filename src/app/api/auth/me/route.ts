@@ -1,20 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseServer } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/server";
 
 export async function GET(request: NextRequest) {
   try {
-    const token = request.cookies.get("sb-auth-token")?.value;
+    const supabase = await createClient();
 
-    if (!token) {
+    const { data: authData, error: authError } = await supabase.auth.getUser();
+    if (authError || !authData.user) {
       return NextResponse.json(
         { error: "Unauthorized" },
         { status: 401 }
       );
     }
-
-    // Get current user from token
-    const { data: authData, error: authError } =
-      await supabaseServer.auth.getUser(token);
 
     if (authError || !authData.user) {
       return NextResponse.json(
@@ -23,28 +20,35 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get user profile
-    const { data: profile, error: profileError } = await supabaseServer
-      .from("user_profiles")
-      .select("*")
-      .eq("auth_id", authData.user.id)
+    // Get user role from public.profiles
+    const { data: roleProfile, error: roleError } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", authData.user.id)
       .single();
 
-    if (profileError) {
+    if (roleError || !roleProfile?.role) {
       return NextResponse.json(
         { error: "User profile not found" },
         { status: 404 }
       );
     }
 
+    // Get any extra account details from user_profiles if available
+    const { data: userProfile } = await supabase
+      .from("user_profiles")
+      .select("id, first_name, last_name")
+      .eq("auth_id", authData.user.id)
+      .single();
+
     return NextResponse.json({
       user: {
         id: authData.user.id,
         email: authData.user.email,
-        role: profile?.role,
-        firstName: profile?.first_name,
-        lastName: profile?.last_name,
-        profileId: profile?.id,
+        role: roleProfile.role,
+        firstName: userProfile?.first_name,
+        lastName: userProfile?.last_name,
+        profileId: userProfile?.id,
       },
     });
   } catch (error: any) {

@@ -1,18 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseServer } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/server";
 
 // GET — returns medications for all patients assigned to this nurse
 export async function GET(request: NextRequest) {
   try {
     const token = request.cookies.get("sb-auth-token")?.value;
+    const supabase = await createClient();
     const isDevMode = process.env.NODE_ENV === "development";
 
     let nurseProfileId: string | null = null;
 
     if (token) {
-      const { data: authData } = await supabaseServer.auth.getUser(token);
+      const { data: authData, error: authError } = await supabase.auth.getUser();
       if (authData?.user) {
-        const { data: profile } = await supabaseServer
+        const { data: profile } = await supabase
           .from("user_profiles")
           .select("id")
           .eq("auth_id", authData.user.id)
@@ -21,7 +22,7 @@ export async function GET(request: NextRequest) {
         nurseProfileId = profile?.id ?? null;
       }
     } else if (isDevMode) {
-      const { data: profile } = await supabaseServer
+      const { data: profile } = await supabase
         .from("user_profiles")
         .select("id")
         .eq("role", "NURSE")
@@ -37,7 +38,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Get patients assigned to this nurse
-    const { data: assignments } = await supabaseServer
+    const { data: assignments } = await supabase
       .from("nurse_patient_assignments")
       .select("patient_id")
       .eq("nurse_id", nurseProfileId)
@@ -50,7 +51,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Get medications for those patients including patient name and adherence
-    const { data: medications, error } = await supabaseServer
+    const { data: medications, error } = await supabase
       .from("medications")
       .select(`
         id,
