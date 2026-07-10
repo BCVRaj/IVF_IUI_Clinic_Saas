@@ -191,6 +191,7 @@ type Patient = {
 
 const TABS = [
   "Overview",
+  "Cycle Monitoring",
   "IVF Cycles",
   "Medications",
   "Inf. History",
@@ -203,6 +204,18 @@ const TABS = [
   "Documents",
 ] as const;
 type Tab = (typeof TABS)[number];
+
+const CYCLE_TABS = [
+  "Investigation",
+  "Ovarian Stimulation",
+  "Egg Pickup",
+  "Embryology",
+  "Embryo Freezing",
+  "Embryo Transfer",
+  "Outcome",
+] as const;
+type CycleTab = (typeof CYCLE_TABS)[number];
+
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -406,6 +419,7 @@ export default function PatientEHRPage({ isNurseView = false }: { isNurseView?: 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>("Overview");
+  const [cycleTab, setCycleTab] = useState<CycleTab>("Investigation");
   const [clearing, setClearing] = useState(false);
 
   // ── Prescribe modal ──
@@ -895,6 +909,220 @@ export default function PatientEHRPage({ isNurseView = false }: { isNurseView?: 
             </button>
           ))}
         </div>
+
+        {/* ══════════════════════════════════════════════════════════════════════ */}
+        {/* ── Cycle Monitoring ── */}
+        {/* ══════════════════════════════════════════════════════════════════════ */}
+        {activeTab === "Cycle Monitoring" && (
+          <div className="space-y-6">
+            {!activeCycle ? (
+              <EmptyState label="No active cycle for this patient. Start a new cycle from the IVF Cycles tab." />
+            ) : (
+              <div className="rounded-xl bg-white p-6 shadow-sm">
+                <div className="mb-6 flex items-center justify-between">
+                  <div>
+                    <h2 className="text-xl font-extrabold text-slate-900">Active Cycle Monitoring</h2>
+                    <p className="mt-1 text-sm text-slate-500">
+                      Cycle ID: <span className="font-mono font-semibold">{activeCycle.id.slice(0, 8)}</span> • Protocol: <span className="font-semibold">{activeCycle.protocol || "—"}</span>
+                    </p>
+                  </div>
+                  <StatusBadge status={activeCycle.status} />
+                </div>
+                
+                {/* Sub-tabs */}
+                <div className="flex flex-wrap gap-2 border-b border-slate-200 pb-4 mb-6">
+                  {CYCLE_TABS.map((tab) => (
+                    <button
+                      key={tab}
+                      onClick={() => setCycleTab(tab)}
+                      className={`px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-lg transition-colors ${
+                        cycleTab === tab
+                          ? "bg-teal-700 text-white shadow"
+                          : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                      }`}
+                    >
+                      {tab}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Sub-tab Content */}
+                <div>
+                  {cycleTab === "Investigation" && (
+                    <div className="space-y-6">
+                      <SectionHeader title="Investigations & Labs" onAdd={() => {}} addLabel="+ Order Test" />
+                      <div className="grid gap-4 md:grid-cols-2">
+                        {/* Mock Lab Results */}
+                        <div className="rounded-xl border border-slate-100 bg-slate-50 p-5">
+                          <h4 className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-500">Hormone Panel</h4>
+                          <InfoGrid rows={[
+                            ["AMH", "2.1 ng/mL"],
+                            ["FSH", "6.4 mIU/mL"],
+                            ["LH", "4.2 mIU/mL"],
+                            ["Estradiol", "45 pg/mL"],
+                            ["TSH", "1.8 µIU/mL"],
+                            ["Prolactin", "14 ng/mL"],
+                          ]} />
+                        </div>
+                        {/* Track statuses */}
+                        <div className="rounded-xl border border-slate-100 bg-slate-50 p-5">
+                          <h4 className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-500">Investigation Status</h4>
+                          <div className="space-y-2 text-sm text-slate-700">
+                            <div className="flex justify-between items-center bg-white p-2 rounded shadow-sm border border-slate-100">
+                              <span>Hormone Panel (Blood)</span>
+                              <span className="text-[10px] font-bold uppercase bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">Pending Verification</span>
+                            </div>
+                            <div className="flex justify-between items-center bg-white p-2 rounded shadow-sm border border-slate-100">
+                              <span>Semen Analysis</span>
+                              <span className="text-[10px] font-bold uppercase bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Printed</span>
+                            </div>
+                            <div className="flex justify-between items-center bg-white p-2 rounded shadow-sm border border-slate-100">
+                              <span>Baseline Ultrasound</span>
+                              <span className="text-[10px] font-bold uppercase bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Completed</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {cycleTab === "Ovarian Stimulation" && (
+                    <div className="space-y-6">
+                      <SectionHeader title="Ovarian Stimulation" />
+                      <div className="rounded-xl border border-slate-100 bg-slate-50 p-5">
+                        <p className="text-sm text-slate-500 mb-4">View and track daily injections and ultrasound follicle measurements.</p>
+                        {/* Link to existing scans/meds for now */}
+                        <div className="flex gap-4">
+                          <button onClick={() => setActiveTab("Scans")} className="rounded-lg bg-teal-700 px-4 py-2 text-xs font-bold uppercase tracking-wider text-white transition-colors hover:bg-teal-800">
+                            View Scans
+                          </button>
+                          <button onClick={() => setActiveTab("Medications")} className="rounded-lg border border-teal-700 bg-white px-4 py-2 text-xs font-bold uppercase tracking-wider text-teal-700 transition-colors hover:bg-slate-50">
+                            View Medications
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {cycleTab === "Egg Pickup" && (
+                    <div className="space-y-6">
+                      <SectionHeader title="Egg Pickup (OPU)" onAdd={() => { closeAllModals(); setOpuOpen(true); }} addLabel="+ Log OPU" />
+                      {!patient.opu_records?.length ? (
+                        <EmptyState label="No OPU records yet." />
+                      ) : (
+                        <div className="space-y-4">
+                          {patient.opu_records.map((o) => (
+                            <div key={o.id} className="rounded-xl border border-slate-100 bg-slate-50 p-5">
+                              <div className="mb-3">
+                                <span className="text-sm font-bold text-slate-700">Retrieval: {fmt(o.retrieval_date)}</span>
+                              </div>
+                              <InfoGrid rows={[
+                                ["Oocytes Retrieved", fmtNum(o.oocytes_retrieved)],
+                                ["Total Follicles Aspirated", fmtNum(o.total_follicles_aspirated)],
+                                ["MII (Mature)", fmtNum(o.mii_count)],
+                                ["MI (Intermediate)", fmtNum(o.mi_count)],
+                                ["GV (Immature)", fmtNum(o.gv_count)],
+                                ["Empty Follicles", fmtNum(o.empty_follicles_count)],
+                              ]} />
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {cycleTab === "Embryology" && (
+                    <div className="space-y-6">
+                      <SectionHeader title="Embryology" onAdd={() => { closeAllModals(); setEmbryoOpen(true); }} addLabel="+ Log Embryology" />
+                      {!patient.embryology_records?.length ? (
+                        <EmptyState label="No embryology records yet." />
+                      ) : (
+                        <div className="space-y-4">
+                          {patient.embryology_records.map((em) => (
+                            <div key={em.id} className="rounded-xl border border-slate-100 bg-slate-50 p-5">
+                              <div className="mb-3 flex items-center gap-3">
+                                <span className="rounded-full bg-violet-100 px-3 py-1 text-xs font-bold text-violet-700">{em.fertilization_method}</span>
+                              </div>
+                              <InfoGrid rows={[
+                                ["Oocytes Inseminated", fmtNum(em.oocytes_inseminated)],
+                                ["2PN (Fertilized)", fmtNum(em.two_pn_count)],
+                                ["Day 3 Cleavage", fmtNum(em.day3_cleavage_count)],
+                                ["Day 5 Blastocysts", fmtNum(em.day5_blastocyst_count)],
+                              ]} />
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {cycleTab === "Embryo Freezing" && (
+                    <div className="space-y-6">
+                      <SectionHeader title="Embryo Freezing (Cryopreservation)" onAdd={() => {}} addLabel="+ Log Freeze" />
+                      <div className="rounded-xl border border-slate-100 bg-slate-50 p-5 text-center">
+                        <p className="text-sm text-slate-500">Embryo Freezing tracking interface.</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {cycleTab === "Embryo Transfer" && (
+                    <div className="space-y-6">
+                      <SectionHeader title="Embryo Transfer" onAdd={() => {}} addLabel="+ Log Transfer" />
+                      {!patient.embryo_transfer_records?.length ? (
+                        <EmptyState label="No embryo transfer records yet." />
+                      ) : (
+                        <div className="space-y-4">
+                          {patient.embryo_transfer_records.map((et) => (
+                            <div key={et.id} className="rounded-xl border border-slate-100 bg-slate-50 p-5">
+                              <div className="mb-3 flex items-center gap-3">
+                                <span className="text-sm font-semibold text-slate-700">{fmt(et.transfer_date)}</span>
+                                <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-700">{et.transfer_type}</span>
+                              </div>
+                              <InfoGrid rows={[
+                                ["Embryos Transferred", fmtNum(et.embryos_transferred)],
+                                ["Embryo Grades", et.embryo_grades],
+                                ["Difficulty", et.difficulty],
+                              ]} />
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {cycleTab === "Outcome" && (
+                    <div className="space-y-6">
+                      <SectionHeader title="Cycle Outcome" onAdd={() => { closeAllModals(); setOutcomeOpen(true); }} addLabel="+ Log Outcome" />
+                      {!patient.cycle_outcomes?.length ? (
+                        <EmptyState label="No cycle outcomes recorded yet." />
+                      ) : (
+                        <div className="space-y-4">
+                          {patient.cycle_outcomes.map((co) => (
+                            <div key={co.id} className="rounded-xl border border-slate-100 bg-slate-50 p-5">
+                              <div className="mb-3 flex items-center gap-3">
+                                {co.clinical_outcome && (
+                                  <span className="rounded-full bg-indigo-100 px-3 py-1 text-xs font-bold text-indigo-700">
+                                    {co.clinical_outcome.replace(/_/g, " ")}
+                                  </span>
+                                )}
+                              </div>
+                              <InfoGrid rows={[
+                                ["β-hCG (Test 1)", co.beta_hcg_date_1 ? `${fmtNum(co.beta_hcg_value_1)} on ${fmt(co.beta_hcg_date_1)}` : "—"],
+                                ["Clinical Pregnancy", co.clinical_pregnancy],
+                                ["Gestational Sacs", fmtNum(co.gestational_sacs_count)],
+                                ["Cardiac Activity", co.cardiac_activity],
+                              ]} />
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* ══════════════════════════════════════════════════════════════════════ */}
         {/* ── Overview ── */}

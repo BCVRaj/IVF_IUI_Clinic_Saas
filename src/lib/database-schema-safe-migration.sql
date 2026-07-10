@@ -890,3 +890,20 @@ GROUP BY p.id, p.first_name, p.last_name, p.email;
 -- ============================================================
 -- DONE — All 26 tables created/verified with indexes and RLS
 -- ============================================================
+
+-- =========================================================================
+-- SYSTEM CONFIGURATION
+-- =========================================================================
+
+CREATE TABLE IF NOT EXISTS hospital_settings (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  hospital_id TEXT UNIQUE NOT NULL,
+  hospital_name TEXT NOT NULL,
+  logo_url TEXT,
+  address_line_1 TEXT,
+  address_line_2 TEXT,
+  contact_phone TEXT,
+  contact_email TEXT,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
+);
+CREATE INDEX IF NOT EXISTS idx_hospital_settings_hospital_id ON hospital_settings(hospital_id);
